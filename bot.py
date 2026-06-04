@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
@@ -38,27 +39,23 @@ async def main() -> None:
     dp.update.middleware(DbSessionMiddleware())
     dp.include_router(setup_routers())
 
-    tasks = [dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())]
-
-    # Запустить вебхук-сервер только если Fragment API ключ задан
-    if config.fragment_api_key:
-        webhook_app = create_webhook_app(bot)
-        runner = web.AppRunner(webhook_app)
-        await runner.setup()
-        port = int(os.getenv("PORT", config.webhook_port))
-        site = web.TCPSite(runner, "0.0.0.0", port)
-        await site.start()
-        logger.info(
-            f"Fragment webhook server started on port {config.webhook_port}\n"
-            f"  → Endpoint: POST /webhook/fragment\n"
-            f"  → Register at: https://v1.fragmentapi.com/partner/dashboard/webhooks"
-        )
+    # Вебхук-сервер запускается ВСЕГДА (нужен для lava-verify, health check и вебхуков)
+    webhook_app = create_webhook_app(bot)
+    runner = web.AppRunner(webhook_app)
+    await runner.setup()
+    port = int(os.getenv("PORT", str(config.webhook_port)))
+    site = web.TCPSite(runner, "0.0.0.0", port)
+    await site.start()
+    logger.info(f"Webhook server started on port {port}")
 
     logger.info("Bot is running. Press Ctrl+C to stop.")
     try:
-        await asyncio.gather(*tasks)
+        await asyncio.gather(
+            dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
+        )
     finally:
         await bot.session.close()
+        await runner.cleanup()
         logger.info("Bot stopped.")
 
 
