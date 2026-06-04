@@ -76,6 +76,7 @@ def load_config() -> Config:
         lava_api_key=getenv("LAVA_API_KEY", ""),
         lava_secret_key=getenv("LAVA_SECRET_KEY", ""),
         lava_shop_id=getenv("LAVA_SHOP_ID", ""),
+        lava_verify_code=getenv("LAVA_VERIFY_CODE", ""),
         cryptobot_token=getenv("CRYPTOBOT_TOKEN", ""),
         stars_50_price=int(getenv("STARS_50_PRICE", "80")),
         stars_100_price=int(getenv("STARS_100_PRICE", "160")),
