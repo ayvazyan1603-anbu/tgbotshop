@@ -1,6 +1,6 @@
 import asyncio
 import logging
-
+import os
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
@@ -45,7 +45,8 @@ async def main() -> None:
         webhook_app = create_webhook_app(bot)
         runner = web.AppRunner(webhook_app)
         await runner.setup()
-        site = web.TCPSite(runner, "0.0.0.0", config.webhook_port)
+        port = int(os.getenv("PORT", config.webhook_port))
+        site = web.TCPSite(runner, "0.0.0.0", port)
         await site.start()
         logger.info(
             f"Fragment webhook server started on port {config.webhook_port}\n"
