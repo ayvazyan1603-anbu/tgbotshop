@@ -230,6 +230,7 @@ def create_webhook_app(bot: Bot) -> web.Application:
     app.router.add_get("/",             health_handler)
     app.router.add_get("/health",       health_handler)
     app.router.add_get("/lava-verify",  lava_verify_handler)
+    app.router.add_get("/lava-verify_b3ec0123194ce388.html", lava_verify_handler)
     app.router.add_post("/webhook/fragment",  fragment_webhook_handler)
     app.router.add_post("/webhook/lava",      lava_webhook_handler)
     app.router.add_post("/webhook/cryptobot", cryptobot_webhook_handler)
