@@ -1,0 +1,186 @@
+import logging
+from aiogram import Router, F, Bot
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import StatesGroup, State
+from aiogram.types import CallbackQuery, Message
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from config import config
+from database import repo
+from database.models import ItemType
+from keyboards.inline import (
+    premium_menu_kb, premium_confirm_kb, main_menu_kb, back_button
+)
+from lexicons.texts import (
+    premium_menu, premium_enter_username, premium_confirm,
+    NOT_ENOUGH_BALANCE, PREMIUM_ORDER_PLACED,
+)
+from services.payment_service import process_purchase, complete_purchase, refund_purchase
+from services.fragment_service import (
+    get_premium_recipient, create_premium_order, FragmentAPIError
+)
+
+logger = logging.getLogger(__name__)
+router = Router()
+
+PREMIUM_PRICES: dict[int, int] = {
+    3:  config.premium_3m_price,
+    6:  config.premium_6m_price,
+    12: config.premium_12m_price,
+}
+
+
+class PremiumState(StatesGroup):
+    waiting_recipient = State()
+
+
+@router.callback_query(F.data == "menu:premium")
+async def cb_premium_menu(callback: CallbackQuery, state: FSMContext) -> None:
+    await state.clear()
+    await callback.message.edit_text(
+        text=premium_menu(),
+        reply_markup=premium_menu_kb(),
+        parse_mode="HTML",
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("premium:"))
+async def cb_premium_select(callback: CallbackQuery, state: FSMContext) -> None:
+    months = int(callback.data.split(":")[1])
+    price = float(PREMIUM_PRICES[months])
+    await state.update_data(premium_months=months, premium_price=price)
+    await state.set_state(PremiumState.waiting_recipient)
+    await callback.message.edit_text(
+        text=premium_enter_username(),
+        reply_markup=back_button("menu:premium"),
+        parse_mode="HTML",
+    )
+    await callback.answer()
+
+
+@router.message(PremiumState.waiting_recipient)
+async def msg_premium_recipient(message: Message, state: FSMContext) -> None:
+    recipient = message.text.strip()
+    data = await state.get_data()
+    months = data["premium_months"]
+    price = data["premium_price"]
+    await state.clear()
+    await message.answer(
+        text=premium_confirm(months, price, recipient),
+        reply_markup=premium_confirm_kb(months, recipient),
+        parse_mode="HTML",
+    )
+
+
+@router.callback_query(F.data.startswith("premium_confirm:"))
+async def cb_premium_confirm(
+    callback: CallbackQuery, session: AsyncSession, bot: Bot
+) -> None:
+    _, months_str, recipient = callback.data.split(":", 2)
+    months = int(months_str)
+    price = float(PREMIUM_PRICES[months])
+    user_id = callback.from_user.id
+
+    order_id = await process_purchase(
+        session=session,
+        user_id=user_id,
+        item_type=ItemType.PREMIUM,
+        item_detail=f"Premium {months}m → {recipient}",
+        price=price,
+        description=f"Telegram Premium {months} мес.",
+    )
+    if order_id is None:
+        await callback.message.edit_text(
+            text=NOT_ENOUGH_BALANCE,
+            reply_markup=main_menu_kb(),
+            parse_mode="HTML",
+        )
+        await callback.answer()
+        return
+
+    await callback.answer("⏳ Отправляем заказ на Fragment...")
+
+    if config.fragment_api_key:
+        try:
+            recipient_info = await get_premium_recipient(recipient, months)
+            fragment_order = await create_premium_order(
+                username=recipient,
+                recipient_hash=recipient_info.recipient_hash,
+                months=months,
+            )
+            from database.models import Order
+            from sqlalchemy import select
+            result = await session.execute(select(Order).where(Order.id == order_id))
+            order = result.scalar_one()
+            order.delivery_data = fragment_order.order_id
+            await session.commit()
+
+            await callback.message.edit_text(
+                text=(
+                    f"✅ <b>Заказ #{order_id} отправлен!</b>\n\n"
+                    f"💎 <b>Premium {months} мес.</b> → <code>{recipient}</code>\n\n"
+                    "Доставка обычно занимает 1–3 минуты.\n"
+                    "Вы получите уведомление, когда подписка будет активирована."
+                ),
+                reply_markup=main_menu_kb(),
+                parse_mode="HTML",
+            )
+
+        except FragmentAPIError as e:
+            logger.error(f"Fragment API error for order {order_id}: {e}")
+            await refund_purchase(session, order_id, user_id, price)
+            await callback.message.edit_text(
+                text=(
+                    f"❌ <b>Ошибка при отправке заказа:</b> {e}\n\n"
+                    f"💳 <b>{price:.2f} руб. возвращены на ваш баланс.</b>"
+                ),
+                reply_markup=main_menu_kb(),
+                parse_mode="HTML",
+            )
+        except Exception as e:
+            logger.error(f"Unexpected error for order {order_id}: {e}")
+            try:
+                from keyboards.inline import admin_order_notify_kb
+                await bot.send_message(
+                    chat_id=config.admin_id,
+                    text=(
+                        f"⚠️ <b>Ошибка Fragment API — заказ #{order_id}</b>\n\n"
+                        f"Товар: 💎 Premium {months}м → <code>{recipient}</code>\n"
+                        f"Покупатель: <code>{user_id}</code>\n"
+                        f"Ошибка: {e}"
+                    ),
+                    reply_markup=admin_order_notify_kb(order_id),
+                    parse_mode="HTML",
+                )
+            except Exception:
+                pass
+            await callback.message.edit_text(
+                text=PREMIUM_ORDER_PLACED(months, recipient),
+                reply_markup=main_menu_kb(),
+                parse_mode="HTML",
+            )
+    else:
+        # Ручная обработка
+        try:
+            from keyboards.inline import admin_order_notify_kb
+            await bot.send_message(
+                chat_id=config.admin_id,
+                text=(
+                    f"📦 <b>Новый заказ #{order_id}</b>\n\n"
+                    f"Товар: 💎 Telegram Premium {months} мес.\n"
+                    f"Получатель: <code>{recipient}</code>\n"
+                    f"Сумма: <b>{price:.2f} руб.</b>\n"
+                    f"Покупатель ID: <code>{user_id}</code>"
+                ),
+                reply_markup=admin_order_notify_kb(order_id),
+                parse_mode="HTML",
+            )
+        except Exception as e:
+            logger.error(f"Failed to notify admin: {e}")
+        await complete_purchase(session, order_id, f"Recipient: {recipient}")
+        await callback.message.edit_text(
+            text=PREMIUM_ORDER_PLACED(months, recipient),
+            reply_markup=main_menu_kb(),
+            parse_mode="HTML",
+        )
