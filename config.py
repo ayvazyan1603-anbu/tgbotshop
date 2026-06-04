@@ -32,6 +32,7 @@ class Config:
     lava_api_key: str          # API ключ из личного кабинета lava.ru
     lava_secret_key: str       # Secret key для проверки подписи вебхука
     lava_shop_id: str          # ID магазина в lava.ru
+    lava_verify_code: str      # lava-verify=xxx из верификации домена
 
     # CryptoBot (TON + крипта)
     cryptobot_token: str       # Токен от @CryptoBot → /pay

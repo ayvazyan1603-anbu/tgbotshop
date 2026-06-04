@@ -210,11 +210,26 @@ async def cryptobot_webhook_handler(request: web.Request) -> web.Response:
     return web.Response(status=200, text="OK")
 
 
+# ─── LAVA DOMAIN VERIFICATION ────────────────────────────────────────────────
+
+async def lava_verify_handler(request: web.Request) -> web.Response:
+    return web.Response(status=200, text=config.lava_verify_code, content_type="text/plain")
+
+
+# ─── HEALTH CHECK ─────────────────────────────────────────────────────────────
+
+async def health_handler(request: web.Request) -> web.Response:
+    return web.Response(status=200, text="OK")
+
+
 # ─── APP FACTORY ─────────────────────────────────────────────────────────────
 
 def create_webhook_app(bot: Bot) -> web.Application:
     app = web.Application()
     app["bot"] = bot
+    app.router.add_get("/",             health_handler)
+    app.router.add_get("/health",       health_handler)
+    app.router.add_get("/lava-verify",  lava_verify_handler)
     app.router.add_post("/webhook/fragment",  fragment_webhook_handler)
     app.router.add_post("/webhook/lava",      lava_webhook_handler)
     app.router.add_post("/webhook/cryptobot", cryptobot_webhook_handler)
