@@ -39,14 +39,15 @@ async def main() -> None:
     dp.update.middleware(DbSessionMiddleware())
     dp.include_router(setup_routers())
 
-    # Вебхук-сервер запускается ВСЕГДА (нужен для lava-verify, health check и вебхуков)
+    # Railway всегда передаёт PORT — используем его
+    port = int(os.environ.get("PORT", 8080))
+
     webhook_app = create_webhook_app(bot)
     runner = web.AppRunner(webhook_app)
     await runner.setup()
-    port = int(os.getenv("PORT", str(config.webhook_port)))
     site = web.TCPSite(runner, "0.0.0.0", port)
     await site.start()
-    logger.info(f"Webhook server started on port {port}")
+    logger.info(f"Web server started on 0.0.0.0:{port}")
 
     logger.info("Bot is running. Press Ctrl+C to stop.")
     try:
