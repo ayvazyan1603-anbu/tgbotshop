@@ -12,10 +12,7 @@ def main_menu_kb() -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="🌟 Купить Stars", callback_data="menu:stars"),
         InlineKeyboardButton(text="💎 Купить Premium", callback_data="menu:premium"),
     )
-    builder.row(
-        InlineKeyboardButton(text="🎁 Обычный подарок", callback_data="menu:gift_regular"),
-        InlineKeyboardButton(text="✨ Особенный подарок", callback_data="menu:gift_special"),
-    )
+    builder.row(InlineKeyboardButton(text="🎁 Удалённые подарки", callback_data="menu:gift_regular"))
     builder.row(InlineKeyboardButton(text="🌐 Купить VPN", callback_data="menu:vpn"))
     builder.row(
         InlineKeyboardButton(text="👤 Профиль", callback_data="menu:profile"),
@@ -109,7 +106,6 @@ def gift_list_kb(gifts: list, gift_type: str) -> InlineKeyboardMarkup:
             text=f"{gift.name} — {gift.price:.0f} руб.",
             callback_data=f"gift_select:{gift.id}",
         ))
-    back_cb = "menu:gift_regular" if gift_type == "regular" else "menu:gift_special"
     builder.row(InlineKeyboardButton(text="🔙 Назад", callback_data="menu:main"))
     return builder.as_markup()
 
@@ -124,8 +120,7 @@ def gift_confirm_kb(gift_id: int, recipient: str) -> InlineKeyboardMarkup:
 
 
 def gift_enter_recipient_kb(gift_type: str) -> InlineKeyboardMarkup:
-    back_cb = "menu:gift_regular" if gift_type == "regular" else "menu:gift_special"
-    return back_button(back_cb)
+    return back_button("menu:gift_regular")
 
 
 # ─── VPN ─────────────────────────────────────────────────────────────────────

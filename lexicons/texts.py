@@ -79,9 +79,7 @@ def premium_confirm(months: int, price: float, recipient: str) -> str:
 def gifts_menu() -> str:
     return (
         "🎁 <b>Магазин Telegram Подарков</b>\n\n"
-        "Вы можете приобрести обычные или лимитированные (особенные) подарки "
-        "для демонстрации в профиле.\n\n"
-        "✨ <i>Особенные подарки выпускаются ограниченным тиражом и могут расти в цене!</i>"
+        "Вы можете приобрести удалённые подарки для демонстрации в профиле."
     )
 
 
@@ -173,7 +171,7 @@ def topup_invoice(amount: float) -> str:
 ITEM_TYPE_NAMES = {
     "stars": "⭐ Telegram Stars",
     "premium": "💎 Telegram Premium",
-    "gift_regular": "🎁 Обычный подарок",
+    "gift_regular": "🎁 Удалённые подарки",
     "gift_special": "✨ Особенный подарок",
     "vpn": "🌐 VPN",
     "balance": "💳 Пополнение баланса",

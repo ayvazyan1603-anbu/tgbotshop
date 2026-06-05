@@ -20,34 +20,26 @@ class GiftState(StatesGroup):
     waiting_recipient = State()
 
 
-@router.callback_query(F.data.in_({"menu:gift_regular", "menu:gift_special"}))
+@router.callback_query(F.data == "menu:gift_regular")
 async def cb_gifts_menu(callback: CallbackQuery, session: AsyncSession) -> None:
-    gift_type = "regular" if callback.data == "menu:gift_regular" else "special"
-    gifts = await repo.get_gifts(session, gift_type)
-    type_label = "обычных" if gift_type == "regular" else "особенных"
+    gifts = await repo.get_gifts(session, "regular")
 
     if not gifts:
         await callback.message.edit_text(
-            text=f"🎁 <b>Магазин {type_label} подарков</b>\n\n<i>Подарки временно недоступны.</i>",
+            text="🎁 <b>Магазин удалённых подарков</b>\n\n<i>Подарки временно недоступны.</i>",
             reply_markup=back_button("menu:main"),
             parse_mode="HTML",
         )
         await callback.answer()
         return
 
-    emoji = "🎁" if gift_type == "regular" else "✨"
-    title = "обычных" if gift_type == "regular" else "особенных (лимитированных)"
     await callback.message.edit_text(
         text=(
-            f"{emoji} <b>Магазин {title} подарков</b>\n\n"
-            + (
-                "Выберите подарок для отправки другу или себе.\n"
-                "Доставка занимает несколько минут." if gift_type == "regular"
-                else "Особенные подарки — лимитированный тираж.\n"
-                     "Могут расти в цене! Доставляются вручную администратором."
-            )
+            "🎁 <b>Магазин удалённых подарков</b>\n\n"
+            "Выберите подарок для отправки другу или себе.\n"
+            "Доставка занимает несколько минут."
         ),
-        reply_markup=gift_list_kb(gifts, gift_type),
+        reply_markup=gift_list_kb(gifts, "regular"),
         parse_mode="HTML",
     )
     await callback.answer()
