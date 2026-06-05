@@ -99,14 +99,29 @@ def premium_confirm_kb(months: int, recipient: str) -> InlineKeyboardMarkup:
 
 # ─── GIFTS ───────────────────────────────────────────────────────────────────
 
-def gift_list_kb(gifts: list, gift_type: str) -> InlineKeyboardMarkup:
+def _gift_stars(gift: Gift) -> str:
+    if gift.description:
+        return gift.description.split(" ", 1)[0]
+    return "50"
+
+
+def _gift_emoji(gift: Gift) -> str:
+    parts = gift.name.split(" ", 1)
+    return parts[0] if len(parts) > 1 else "🎁"
+
+
+def gift_list_kb(gifts: list) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    for gift in gifts:
-        builder.row(InlineKeyboardButton(
-            text=f"{gift.name} — {gift.price:.0f} руб.",
+    buttons = [
+        InlineKeyboardButton(
+            text=f"{_gift_emoji(gift)} [{i}] | {_gift_stars(gift)} ⭐",
             callback_data=f"gift_select:{gift.id}",
-        ))
-    builder.row(InlineKeyboardButton(text="🔙 Назад", callback_data="menu:main"))
+        )
+        for i, gift in enumerate(gifts, 1)
+    ]
+    for i in range(0, len(buttons), 2):
+        builder.row(*buttons[i:i + 2])
+    builder.row(InlineKeyboardButton(text="⬅️ Назад", callback_data="menu:gift_regular"))
     return builder.as_markup()
 
 

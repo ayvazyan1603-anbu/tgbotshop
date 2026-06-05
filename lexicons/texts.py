@@ -100,6 +100,17 @@ def gift_enter_recipient() -> str:
     )
 
 
+def gift_list_text(recipient: str, gifts: list) -> str:
+    if recipient.startswith("@") or recipient.isdigit():
+        display = recipient
+    else:
+        display = f"@{recipient.lstrip('@')}"
+    lines = [f"🎁 <b>Выберите подарок для {display}:</b>\n"]
+    for i, gift in enumerate(gifts, 1):
+        lines.append(f"[{i}] — {gift.name}")
+    return "\n".join(lines)
+
+
 # ─── VPN ─────────────────────────────────────────────────────────────────────
 
 def vpn_menu() -> str:

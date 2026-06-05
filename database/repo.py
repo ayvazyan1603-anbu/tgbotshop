@@ -206,7 +206,9 @@ async def add_vpn_key(
 
 async def get_gifts(session: AsyncSession, gift_type: str) -> list[Gift]:
     result = await session.execute(
-        select(Gift).where(Gift.gift_type == gift_type, Gift.is_available == True)
+        select(Gift)
+        .where(Gift.gift_type == gift_type, Gift.is_available == True)
+        .order_by(Gift.id)
     )
     return list(result.scalars().all())
 

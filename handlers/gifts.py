@@ -9,7 +9,7 @@ from config import config
 from database import repo
 from database.models import ItemType
 from keyboards.inline import gift_list_kb, gift_confirm_kb, main_menu_kb, back_button
-from lexicons.texts import gifts_menu, gift_confirm, gift_enter_recipient, NOT_ENOUGH_BALANCE
+from lexicons.texts import gift_confirm, gift_enter_recipient, gift_list_text, NOT_ENOUGH_BALANCE
 from services.payment_service import process_purchase, complete_purchase
 
 logger = logging.getLogger(__name__)
@@ -21,38 +21,8 @@ class GiftState(StatesGroup):
 
 
 @router.callback_query(F.data == "menu:gift_regular")
-async def cb_gifts_menu(callback: CallbackQuery, session: AsyncSession) -> None:
-    gifts = await repo.get_gifts(session, "regular")
-
-    if not gifts:
-        await callback.message.edit_text(
-            text="🎁 <b>Магазин удалённых подарков</b>\n\n<i>Подарки временно недоступны.</i>",
-            reply_markup=back_button("menu:main"),
-            parse_mode="HTML",
-        )
-        await callback.answer()
-        return
-
-    await callback.message.edit_text(
-        text=(
-            "🎁 <b>Магазин удалённых подарков</b>\n\n"
-            "Выберите подарок для отправки другу или себе.\n"
-            "Доставка занимает несколько минут."
-        ),
-        reply_markup=gift_list_kb(gifts, "regular"),
-        parse_mode="HTML",
-    )
-    await callback.answer()
-
-
-@router.callback_query(F.data.startswith("gift_select:"))
-async def cb_gift_select(callback: CallbackQuery, session: AsyncSession, state: FSMContext) -> None:
-    gift_id = int(callback.data.split(":")[1])
-    gift = await repo.get_gift(session, gift_id)
-    if not gift or not gift.is_available:
-        await callback.answer("❌ Подарок недоступен", show_alert=True)
-        return
-    await state.update_data(gift_id=gift_id, gift_price=gift.price, gift_name=gift.name, gift_type=gift.gift_type)
+async def cb_gifts_menu(callback: CallbackQuery, state: FSMContext) -> None:
+    await state.clear()
     await state.set_state(GiftState.waiting_recipient)
     await callback.message.edit_text(
         text=gift_enter_recipient(),
@@ -63,15 +33,49 @@ async def cb_gift_select(callback: CallbackQuery, session: AsyncSession, state: 
 
 
 @router.message(GiftState.waiting_recipient)
-async def msg_gift_recipient(message: Message, state: FSMContext) -> None:
+async def msg_gift_recipient(message: Message, state: FSMContext, session: AsyncSession) -> None:
     recipient = message.text.strip()
-    data = await state.get_data()
-    await state.clear()
+    if not recipient:
+        return
+
+    gifts = await repo.get_gifts(session, "regular")
+    if not gifts:
+        await state.clear()
+        await message.answer(
+            text="🎁 <b>Удалённые подарки</b>\n\n<i>Подарки временно недоступны.</i>",
+            reply_markup=back_button("menu:main"),
+            parse_mode="HTML",
+        )
+        return
+
+    await state.update_data(recipient=recipient)
+    await state.set_state(None)
     await message.answer(
-        text=gift_confirm(data["gift_name"], data["gift_price"], recipient),
-        reply_markup=gift_confirm_kb(data["gift_id"], recipient),
+        text=gift_list_text(recipient, gifts),
+        reply_markup=gift_list_kb(gifts),
         parse_mode="HTML",
     )
+
+
+@router.callback_query(F.data.startswith("gift_select:"))
+async def cb_gift_select(callback: CallbackQuery, session: AsyncSession, state: FSMContext) -> None:
+    gift_id = int(callback.data.split(":")[1])
+    gift = await repo.get_gift(session, gift_id)
+    if not gift or not gift.is_available:
+        await callback.answer("❌ Подарок недоступен", show_alert=True)
+        return
+
+    recipient = (await state.get_data()).get("recipient")
+    if not recipient:
+        await callback.answer("Сначала укажите получателя", show_alert=True)
+        return
+
+    await callback.message.edit_text(
+        text=gift_confirm(gift.name, gift.price, recipient),
+        reply_markup=gift_confirm_kb(gift_id, recipient),
+        parse_mode="HTML",
+    )
+    await callback.answer()
 
 
 @router.callback_query(F.data.startswith("gift_confirm:"))
