@@ -60,6 +60,7 @@ async def cb_stars_menu(callback: CallbackQuery, state: FSMContext) -> None:
     await send_or_edit_photo(
         event=callback,
         photo_id=config.photo_id_stars,
+        photo_unique_id=config.photo_unique_id_stars,
         text=stars_menu(),
         reply_markup=stars_menu_kb(),
     )

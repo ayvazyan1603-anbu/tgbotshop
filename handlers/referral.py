@@ -35,6 +35,7 @@ async def cb_referral(callback: CallbackQuery, session: AsyncSession, bot: Bot) 
     await send_or_edit_photo(
         event=callback,
         photo_id=config.photo_id_referral,
+        photo_unique_id=config.photo_unique_id_referral,
         text=referral_text(
             bot_username=bot_info.username,
             user_id=user.id,

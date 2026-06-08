@@ -28,6 +28,7 @@ async def cb_gifts_menu(callback: CallbackQuery, state: FSMContext) -> None:
     await send_or_edit_photo(
         event=callback,
         photo_id=config.photo_id_gifts,
+        photo_unique_id=config.photo_unique_id_gifts,
         text=gift_enter_recipient(),
         reply_markup=back_button("menu:main"),
     )

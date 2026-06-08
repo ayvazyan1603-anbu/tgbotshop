@@ -38,6 +38,7 @@ async def cb_profile(callback: CallbackQuery, session: AsyncSession) -> None:
     await send_or_edit_photo(
         event=callback,
         photo_id=config.photo_id_profile,
+        photo_unique_id=config.photo_unique_id_profile,
         text=profile_text(user.id, reg_date, user.balance, total_orders),
         reply_markup=profile_kb(),
     )

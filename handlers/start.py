@@ -47,6 +47,7 @@ async def cmd_start(message: Message, session: AsyncSession) -> None:
     await send_or_edit_photo(
         event=message,
         photo_id=config.photo_id_main,
+        photo_unique_id=config.photo_unique_id_main,
         text=main_menu(user.balance),
         reply_markup=main_menu_kb(),
     )
@@ -59,6 +60,7 @@ async def cb_main_menu(callback: CallbackQuery, session: AsyncSession) -> None:
     await send_or_edit_photo(
         event=callback,
         photo_id=config.photo_id_main,
+        photo_unique_id=config.photo_unique_id_main,
         text=main_menu(balance),
         reply_markup=main_menu_kb(),
     )

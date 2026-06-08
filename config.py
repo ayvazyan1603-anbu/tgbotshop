@@ -52,6 +52,15 @@ class Config:
     photo_id_referral: str
     photo_id_support:  str
 
+    # file_unique_id для быстрого сравнения (не меняется никогда)
+    photo_unique_id_main:     str
+    photo_unique_id_stars:    str
+    photo_unique_id_premium:  str
+    photo_unique_id_gifts:    str
+    photo_unique_id_profile:  str
+    photo_unique_id_referral: str
+    photo_unique_id_support:  str
+
     # Prices (RUB)
     stars_50_price: int
     stars_100_price: int
@@ -104,6 +113,13 @@ def load_config() -> Config:
         photo_id_profile=getenv("PHOTO_ID_PROFILE", ""),
         photo_id_referral=getenv("PHOTO_ID_REFERRAL", ""),
         photo_id_support=getenv("PHOTO_ID_SUPPORT", ""),
+        photo_unique_id_main=getenv("PHOTO_UNIQUE_ID_MAIN", ""),
+        photo_unique_id_stars=getenv("PHOTO_UNIQUE_ID_STARS", ""),
+        photo_unique_id_premium=getenv("PHOTO_UNIQUE_ID_PREMIUM", ""),
+        photo_unique_id_gifts=getenv("PHOTO_UNIQUE_ID_GIFTS", ""),
+        photo_unique_id_profile=getenv("PHOTO_UNIQUE_ID_PROFILE", ""),
+        photo_unique_id_referral=getenv("PHOTO_UNIQUE_ID_REFERRAL", ""),
+        photo_unique_id_support=getenv("PHOTO_UNIQUE_ID_SUPPORT", ""),
         stars_50_price=int(getenv("STARS_50_PRICE", "80")),
         stars_100_price=int(getenv("STARS_100_PRICE", "160")),
         stars_150_price=int(getenv("STARS_150_PRICE", "220")),

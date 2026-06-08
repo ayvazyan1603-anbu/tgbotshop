@@ -41,6 +41,7 @@ async def cb_premium_menu(callback: CallbackQuery, state: FSMContext) -> None:
     await send_or_edit_photo(
         event=callback,
         photo_id=config.photo_id_premium,
+        photo_unique_id=config.photo_unique_id_premium,
         text=premium_menu(),
         reply_markup=premium_menu_kb(),
     )

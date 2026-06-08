@@ -22,6 +22,7 @@ async def cb_support(callback: CallbackQuery) -> None:
     await send_or_edit_photo(
         event=callback,
         photo_id=config.photo_id_support,
+        photo_unique_id=config.photo_unique_id_support,
         text=support_text(),
         reply_markup=support_kb(config.support_username),
     )
