@@ -161,6 +161,56 @@ async def cb_topup_lava(callback: CallbackQuery, bot: Bot) -> None:
         )
 
 
+# ─── FREEKASSA (Карта / СБП) ──────────────────────────────────────────────────
+
+@router.callback_query(F.data.startswith("topup_fk:"))
+async def cb_topup_freekassa(callback: CallbackQuery) -> None:
+    amount  = int(callback.data.split(":")[1])
+    user_id = callback.from_user.id
+
+    if not config.freekassa_shop_id:
+        await callback.answer("❌ FreeKassa временно недоступна", show_alert=True)
+        return
+
+    await callback.answer("⏳ Формируем ссылку...")
+
+    try:
+        from services.freekassa_service import create_invoice
+        invoice = await create_invoice(
+            amount=float(amount),
+            user_id=user_id,
+            comment=f"Пополнение баланса {amount} руб.",
+        )
+        from aiogram.types import InlineKeyboardButton
+        from aiogram.utils.keyboard import InlineKeyboardBuilder
+        builder = InlineKeyboardBuilder()
+        builder.row(InlineKeyboardButton(
+            text=f"💳 Оплатить {amount} руб.",
+            url=invoice.url,
+        ))
+        builder.row(InlineKeyboardButton(
+            text="🔙 Назад", callback_data="profile:topup"
+        ))
+        await callback.message.edit_text(
+            text=(
+                f"💳 <b>Оплата через FreeKassa</b>\n\n"
+                f"Сумма: <b>{amount} руб.</b>\n\n"
+                "Доступны: банковские карты, СБП, ЮMoney, QIWI и другие.\n"
+                "Нажмите кнопку ниже для перехода к оплате.\n"
+                "После оплаты баланс пополнится <b>автоматически</b>."
+            ),
+            reply_markup=builder.as_markup(),
+            parse_mode="HTML",
+        )
+    except Exception as e:
+        logger.error(f"FreeKassa invoice error: {e}")
+        await callback.message.edit_text(
+            text=f"❌ <b>Ошибка создания ссылки:</b> {e}\n\nПопробуйте позже.",
+            reply_markup=back_button("profile:topup"),
+            parse_mode="HTML",
+        )
+
+
 # ─── CRYPTOBOT (TON) ─────────────────────────────────────────────────────────
 
 @router.callback_query(F.data.startswith("topup_ton:"))

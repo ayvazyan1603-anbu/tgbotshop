@@ -37,6 +37,12 @@ class Config:
     # CryptoBot (TON + крипта)
     cryptobot_token: str       # Токен от @CryptoBot → /pay
 
+    # FreeKassa (карты, СБП, кошельки)
+    freekassa_shop_id: str     # ID магазина (MERCHANT_ID)
+    freekassa_secret1: str     # Секретное слово 1 (для формы оплаты)
+    freekassa_secret2: str     # Секретное слово 2 (для проверки вебхука)
+    freekassa_api_key: str     # API-ключ (для запросов к API)
+
     # Prices (RUB)
     stars_50_price: int
     stars_100_price: int
@@ -78,6 +84,10 @@ def load_config() -> Config:
         lava_shop_id=getenv("LAVA_SHOP_ID", ""),
         lava_verify_code=getenv("LAVA_VERIFY_CODE", ""),
         cryptobot_token=getenv("CRYPTOBOT_TOKEN", ""),
+        freekassa_shop_id=getenv("FREEKASSA_SHOP_ID", ""),
+        freekassa_secret1=getenv("FREEKASSA_SECRET1", ""),
+        freekassa_secret2=getenv("FREEKASSA_SECRET2", ""),
+        freekassa_api_key=getenv("FREEKASSA_API_KEY", ""),
         stars_50_price=int(getenv("STARS_50_PRICE", "80")),
         stars_100_price=int(getenv("STARS_100_PRICE", "160")),
         stars_150_price=int(getenv("STARS_150_PRICE", "220")),

@@ -1,8 +1,10 @@
 """
 Единый вебхук-сервер для всех платёжных систем:
-  POST /webhook/fragment   — iStar (доставка Stars/Premium)
-  POST /webhook/lava       — Lava.ru (пополнение через СБП)
-  POST /webhook/cryptobot  — CryptoBot (пополнение через TON)
+  POST /webhook/fragment    — iStar (доставка Stars/Premium)
+  POST /webhook/lava        — Lava.ru (пополнение через СБП)
+  POST /webhook/cryptobot   — CryptoBot (пополнение через TON)
+  POST /webhook/freekassa   — FreeKassa (карты, СБП, кошельки)
+  GET  /webhook/freekassa   — FreeKassa (проверка домена: ответ YES)
 """
 import hashlib
 import hmac
@@ -18,6 +20,7 @@ from database.models import Order, OrderStatus
 from keyboards.inline import main_menu_kb
 from services.lava_service import verify_lava_webhook
 from services.cryptobot_service import verify_cryptobot_webhook
+from services.freekassa_service import verify_freekassa_webhook
 
 logger = logging.getLogger(__name__)
 
@@ -216,6 +219,72 @@ async def lava_verify_handler(request: web.Request) -> web.Response:
     return web.Response(status=200, text=config.lava_verify_code, content_type="text/plain")
 
 
+# ─── FREEKASSA WEBHOOK ───────────────────────────────────────────────────────
+
+async def freekassa_webhook_handler(request: web.Request) -> web.Response:
+    """
+    FreeKassa отправляет GET или POST при успешной оплате.
+    Обязательные поля: MERCHANT_ID, AMOUNT, intid, MERCHANT_ORDER_ID, P_EMAIL, P_PHONE,
+                       CUR_ID, SIGN, us_user_id (наш кастомный параметр).
+    При успехе нужно ответить строкой 'YES'.
+    """
+    bot: Bot = request.app["bot"]
+
+    # FreeKassa может слать и GET, и POST — читаем оба
+    if request.method == "POST":
+        try:
+            data = await request.post()
+        except Exception:
+            data = {}
+    else:
+        data = request.rel_url.query
+
+    merchant_id = data.get("MERCHANT_ID", "")
+    amount      = data.get("AMOUNT", "")
+    order_id    = data.get("MERCHANT_ORDER_ID", "")
+    sign        = data.get("SIGN", "")
+    user_id_str = data.get("us_user_id", "")   # передаём при создании ссылки
+
+    # Проверка подписи
+    if not verify_freekassa_webhook(merchant_id, amount, order_id, sign):
+        logger.warning(f"Invalid FreeKassa signature | order={order_id}")
+        return web.Response(status=403, text="Invalid signature")
+
+    try:
+        user_id    = int(user_id_str)
+        amount_rub = float(amount)
+        if not user_id or amount_rub <= 0:
+            raise ValueError("Bad user_id or amount")
+    except (ValueError, TypeError) as e:
+        logger.error(f"FreeKassa parse error: {e} | data: {dict(data)}")
+        return web.Response(status=200, text="YES")   # всё равно отвечаем YES
+
+    async with async_session_factory() as session:
+        from services.payment_service import credit_balance
+        new_balance = await credit_balance(
+            session=session,
+            user_id=user_id,
+            amount=amount_rub,
+            description=f"Пополнение через FreeKassa {amount_rub:.2f} руб.",
+        )
+        try:
+            await bot.send_message(
+                chat_id=user_id,
+                text=(
+                    f"✅ <b>Баланс пополнен!</b>\n\n"
+                    f"Сумма: <b>+{amount_rub:.2f} руб.</b>\n"
+                    f"Текущий баланс: <b>{new_balance:.2f} руб.</b>"
+                ),
+                reply_markup=main_menu_kb(),
+                parse_mode="HTML",
+            )
+        except Exception as e:
+            logger.error(f"Notify error: {e}")
+
+    logger.info(f"FreeKassa payment OK | order={order_id} user={user_id} amount={amount_rub}")
+    return web.Response(status=200, text="YES")
+
+
 # ─── HEALTH CHECK ─────────────────────────────────────────────────────────────
 
 async def health_handler(request: web.Request) -> web.Response:
@@ -231,7 +300,9 @@ def create_webhook_app(bot: Bot) -> web.Application:
     app.router.add_get("/health",       health_handler)
     app.router.add_get("/lava-verify",  lava_verify_handler)
     app.router.add_get("/lava-verify_b3ec0123194ce388.html", lava_verify_handler)
-    app.router.add_post("/webhook/fragment",  fragment_webhook_handler)
-    app.router.add_post("/webhook/lava",      lava_webhook_handler)
-    app.router.add_post("/webhook/cryptobot", cryptobot_webhook_handler)
+    app.router.add_post("/webhook/fragment",   fragment_webhook_handler)
+    app.router.add_post("/webhook/lava",       lava_webhook_handler)
+    app.router.add_post("/webhook/cryptobot",  cryptobot_webhook_handler)
+    app.router.add_post("/webhook/freekassa",  freekassa_webhook_handler)
+    app.router.add_get("/webhook/freekassa",   freekassa_webhook_handler)  # FK иногда шлёт GET
     return app
