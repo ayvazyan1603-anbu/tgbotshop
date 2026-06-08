@@ -11,6 +11,7 @@ from database.models import ItemType
 from keyboards.inline import gift_list_kb, gift_confirm_kb, main_menu_kb, back_button
 from lexicons.texts import gift_confirm, gift_enter_recipient, gift_list_text, NOT_ENOUGH_BALANCE
 from services.payment_service import process_purchase, complete_purchase
+from utils.photo_utils import send_or_edit_photo
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -24,10 +25,11 @@ class GiftState(StatesGroup):
 async def cb_gifts_menu(callback: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
     await state.set_state(GiftState.waiting_recipient)
-    await callback.message.edit_text(
+    await send_or_edit_photo(
+        event=callback,
+        photo_id=config.photo_id_gifts,
         text=gift_enter_recipient(),
         reply_markup=back_button("menu:main"),
-        parse_mode="HTML",
     )
     await callback.answer()
 

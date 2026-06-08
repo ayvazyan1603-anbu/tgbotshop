@@ -19,6 +19,7 @@ from services.payment_service import process_purchase, complete_purchase, refund
 from services.fragment_service import (
     get_star_recipient, create_star_order, FragmentAPIError
 )
+from utils.photo_utils import send_or_edit_photo
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -56,10 +57,11 @@ class StarsState(StatesGroup):
 @router.callback_query(F.data == "menu:stars")
 async def cb_stars_menu(callback: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
-    await callback.message.edit_text(
+    await send_or_edit_photo(
+        event=callback,
+        photo_id=config.photo_id_stars,
         text=stars_menu(),
         reply_markup=stars_menu_kb(),
-        parse_mode="HTML",
     )
     await callback.answer()
 

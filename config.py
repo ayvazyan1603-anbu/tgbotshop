@@ -43,6 +43,15 @@ class Config:
     freekassa_secret2: str     # Секретное слово 2 (для проверки вебхука)
     freekassa_api_key: str     # API-ключ (для запросов к API)
 
+    # Фото для разделов меню (file_id после загрузки через upload_photos.py)
+    photo_id_main:     str
+    photo_id_stars:    str
+    photo_id_premium:  str
+    photo_id_gifts:    str
+    photo_id_profile:  str
+    photo_id_referral: str
+    photo_id_support:  str
+
     # Prices (RUB)
     stars_50_price: int
     stars_100_price: int
@@ -88,6 +97,13 @@ def load_config() -> Config:
         freekassa_secret1=getenv("FREEKASSA_SECRET1", ""),
         freekassa_secret2=getenv("FREEKASSA_SECRET2", ""),
         freekassa_api_key=getenv("FREEKASSA_API_KEY", ""),
+        photo_id_main=getenv("PHOTO_ID_MAIN", ""),
+        photo_id_stars=getenv("PHOTO_ID_STARS", ""),
+        photo_id_premium=getenv("PHOTO_ID_PREMIUM", ""),
+        photo_id_gifts=getenv("PHOTO_ID_GIFTS", ""),
+        photo_id_profile=getenv("PHOTO_ID_PROFILE", ""),
+        photo_id_referral=getenv("PHOTO_ID_REFERRAL", ""),
+        photo_id_support=getenv("PHOTO_ID_SUPPORT", ""),
         stars_50_price=int(getenv("STARS_50_PRICE", "80")),
         stars_100_price=int(getenv("STARS_100_PRICE", "160")),
         stars_150_price=int(getenv("STARS_150_PRICE", "220")),

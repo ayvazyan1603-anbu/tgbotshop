@@ -9,6 +9,7 @@ from database import repo
 from database.models import OrderStatus
 from keyboards.inline import support_kb, main_menu_kb, admin_order_notify_kb
 from lexicons.texts import support_text
+from utils.photo_utils import send_or_edit_photo
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -18,10 +19,11 @@ router = Router()
 
 @router.callback_query(F.data == "menu:support")
 async def cb_support(callback: CallbackQuery) -> None:
-    await callback.message.edit_text(
+    await send_or_edit_photo(
+        event=callback,
+        photo_id=config.photo_id_support,
         text=support_text(),
         reply_markup=support_kb(config.support_username),
-        parse_mode="HTML",
     )
     await callback.answer()
 

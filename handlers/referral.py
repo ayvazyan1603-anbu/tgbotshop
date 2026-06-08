@@ -9,6 +9,7 @@ from config import config
 from database import repo
 from keyboards.inline import referral_kb, main_menu_kb, back_button
 from lexicons.texts import referral_text, WITHDRAWAL_REQUEST
+from utils.photo_utils import send_or_edit_photo
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -31,7 +32,9 @@ async def cb_referral(callback: CallbackQuery, session: AsyncSession, bot: Bot) 
     ref_count = await repo.get_referral_count(session, user.id)
     bot_info = await bot.get_me()
 
-    await callback.message.edit_text(
+    await send_or_edit_photo(
+        event=callback,
+        photo_id=config.photo_id_referral,
         text=referral_text(
             bot_username=bot_info.username,
             user_id=user.id,
@@ -39,8 +42,6 @@ async def cb_referral(callback: CallbackQuery, session: AsyncSession, bot: Bot) 
             ref_earned=user.ref_earned,
         ),
         reply_markup=referral_kb(),
-        parse_mode="HTML",
-        disable_web_page_preview=True,
     )
     await callback.answer()
 

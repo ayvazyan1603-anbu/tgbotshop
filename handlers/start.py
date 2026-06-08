@@ -7,6 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import repo
 from keyboards.inline import main_menu_kb, back_to_main_kb
 from lexicons.texts import main_menu
+from utils.photo_utils import send_or_edit_photo
+from config import config
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -42,10 +44,11 @@ async def cmd_start(message: Message, session: AsyncSession) -> None:
             f"New user {message.from_user.id} registered via referral of {referrer_id}"
         )
 
-    await message.answer(
+    await send_or_edit_photo(
+        event=message,
+        photo_id=config.photo_id_main,
         text=main_menu(user.balance),
         reply_markup=main_menu_kb(),
-        parse_mode="HTML",
     )
 
 
@@ -53,9 +56,10 @@ async def cmd_start(message: Message, session: AsyncSession) -> None:
 async def cb_main_menu(callback: CallbackQuery, session: AsyncSession) -> None:
     user = await repo.get_user(session, callback.from_user.id)
     balance = user.balance if user else 0.0
-    await callback.message.edit_text(
+    await send_or_edit_photo(
+        event=callback,
+        photo_id=config.photo_id_main,
         text=main_menu(balance),
         reply_markup=main_menu_kb(),
-        parse_mode="HTML",
     )
     await callback.answer()

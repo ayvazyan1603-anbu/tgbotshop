@@ -19,6 +19,7 @@ from services.payment_service import process_purchase, complete_purchase, refund
 from services.fragment_service import (
     get_premium_recipient, create_premium_order, FragmentAPIError
 )
+from utils.photo_utils import send_or_edit_photo
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -37,10 +38,11 @@ class PremiumState(StatesGroup):
 @router.callback_query(F.data == "menu:premium")
 async def cb_premium_menu(callback: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
-    await callback.message.edit_text(
+    await send_or_edit_photo(
+        event=callback,
+        photo_id=config.photo_id_premium,
         text=premium_menu(),
         reply_markup=premium_menu_kb(),
-        parse_mode="HTML",
     )
     await callback.answer()
 

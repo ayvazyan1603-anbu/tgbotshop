@@ -15,6 +15,7 @@ from lexicons.texts import (
     BALANCE_UPDATED, INVALID_AMOUNT,
 )
 from services.payment_service import credit_balance
+from utils.photo_utils import send_or_edit_photo
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -34,10 +35,11 @@ async def cb_profile(callback: CallbackQuery, session: AsyncSession) -> None:
         return
     total_orders = await repo.get_total_orders_count(session, user.id)
     reg_date = user.created_at.strftime("%d.%m.%Y")
-    await callback.message.edit_text(
+    await send_or_edit_photo(
+        event=callback,
+        photo_id=config.photo_id_profile,
         text=profile_text(user.id, reg_date, user.balance, total_orders),
         reply_markup=profile_kb(),
-        parse_mode="HTML",
     )
     await callback.answer()
 
@@ -156,56 +158,6 @@ async def cb_topup_lava(callback: CallbackQuery, bot: Bot) -> None:
         logger.error(f"Lava invoice error: {e}")
         await callback.message.edit_text(
             text=f"❌ <b>Ошибка создания счёта:</b> {e}\n\nПопробуйте позже.",
-            reply_markup=back_button("profile:topup"),
-            parse_mode="HTML",
-        )
-
-
-# ─── FREEKASSA (Карта / СБП) ──────────────────────────────────────────────────
-
-@router.callback_query(F.data.startswith("topup_fk:"))
-async def cb_topup_freekassa(callback: CallbackQuery) -> None:
-    amount  = int(callback.data.split(":")[1])
-    user_id = callback.from_user.id
-
-    if not config.freekassa_shop_id:
-        await callback.answer("❌ FreeKassa временно недоступна", show_alert=True)
-        return
-
-    await callback.answer("⏳ Формируем ссылку...")
-
-    try:
-        from services.freekassa_service import create_invoice
-        invoice = await create_invoice(
-            amount=float(amount),
-            user_id=user_id,
-            comment=f"Пополнение баланса {amount} руб.",
-        )
-        from aiogram.types import InlineKeyboardButton
-        from aiogram.utils.keyboard import InlineKeyboardBuilder
-        builder = InlineKeyboardBuilder()
-        builder.row(InlineKeyboardButton(
-            text=f"💳 Оплатить {amount} руб.",
-            url=invoice.url,
-        ))
-        builder.row(InlineKeyboardButton(
-            text="🔙 Назад", callback_data="profile:topup"
-        ))
-        await callback.message.edit_text(
-            text=(
-                f"💳 <b>Оплата через FreeKassa</b>\n\n"
-                f"Сумма: <b>{amount} руб.</b>\n\n"
-                "Доступны: банковские карты, СБП, ЮMoney, QIWI и другие.\n"
-                "Нажмите кнопку ниже для перехода к оплате.\n"
-                "После оплаты баланс пополнится <b>автоматически</b>."
-            ),
-            reply_markup=builder.as_markup(),
-            parse_mode="HTML",
-        )
-    except Exception as e:
-        logger.error(f"FreeKassa invoice error: {e}")
-        await callback.message.edit_text(
-            text=f"❌ <b>Ошибка создания ссылки:</b> {e}\n\nПопробуйте позже.",
             reply_markup=back_button("profile:topup"),
             parse_mode="HTML",
         )
