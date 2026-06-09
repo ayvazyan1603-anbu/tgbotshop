@@ -9,7 +9,7 @@ from database import repo
 from database.models import OrderStatus
 from keyboards.inline import support_kb, main_menu_kb, admin_order_notify_kb
 from lexicons.texts import support_text
-from utils.photo_utils import send_or_edit_photo
+from utils.photo_utils import send_or_edit_photo, safe_edit
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -54,7 +54,8 @@ async def cb_admin_complete(callback: CallbackQuery, session: AsyncSession, bot:
         )
     except Exception as e:
         logger.error(f"Notify error: {e}")
-    await callback.message.edit_text(callback.message.text + "\n\n✅ <b>ВЫПОЛНЕН</b>", parse_mode="HTML")
+    current_text = callback.message.text or callback.message.caption or ""
+    await safe_edit(callback.message, current_text + "\n\n✅ <b>ВЫПОЛНЕН</b>", parse_mode="HTML")
     await callback.answer("✅ Выполнен")
 
 
@@ -86,7 +87,8 @@ async def cb_admin_fail(callback: CallbackQuery, session: AsyncSession, bot: Bot
         )
     except Exception as e:
         logger.error(f"Notify error: {e}")
-    await callback.message.edit_text(callback.message.text + "\n\n❌ <b>ОТКЛОНЁН — возврат выполнен</b>", parse_mode="HTML")
+    current_text = callback.message.text or callback.message.caption or ""
+    await safe_edit(callback.message, current_text + "\n\n❌ <b>ОТКЛОНЁН — возврат выполнен</b>", parse_mode="HTML")
     await callback.answer("↩️ Отклонён")
 
 
