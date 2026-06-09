@@ -11,7 +11,7 @@ from database.models import ItemType
 from keyboards.inline import gift_list_kb, gift_confirm_kb, main_menu_kb, back_button
 from lexicons.texts import gift_confirm, gift_enter_recipient, gift_list_text, NOT_ENOUGH_BALANCE
 from services.payment_service import process_purchase, complete_purchase
-from utils.photo_utils import send_or_edit_photo
+from utils.photo_utils import send_or_edit_photo, safe_edit
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -73,7 +73,7 @@ async def cb_gift_select(callback: CallbackQuery, session: AsyncSession, state: 
         await callback.answer("Сначала укажите получателя", show_alert=True)
         return
 
-    await callback.message.edit_text(
+    await safe_edit(callback.message, 
         text=gift_confirm(gift.name, gift.price, recipient),
         reply_markup=gift_confirm_kb(gift_id, recipient),
         parse_mode="HTML",
@@ -101,7 +101,7 @@ async def cb_gift_confirm(callback: CallbackQuery, session: AsyncSession, bot: B
     )
 
     if order_id is None:
-        await callback.message.edit_text(text=NOT_ENOUGH_BALANCE, reply_markup=main_menu_kb(), parse_mode="HTML")
+        await safe_edit(callback.message, text=NOT_ENOUGH_BALANCE, reply_markup=main_menu_kb(), parse_mode="HTML")
         await callback.answer()
         return
 
@@ -130,7 +130,7 @@ async def cb_gift_confirm(callback: CallbackQuery, session: AsyncSession, bot: B
         logger.error(f"Admin notify error: {e}")
 
     await complete_purchase(session, order_id, f"{gift.name} → {recipient}")
-    await callback.message.edit_text(
+    await safe_edit(callback.message, 
         text=(
             f"✅ <b>Заявка принята!</b>\n\n"
             f"Подарок: <b>{gift.name}</b>\n"
