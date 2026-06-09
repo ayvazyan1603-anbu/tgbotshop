@@ -1,228 +1,235 @@
-import logging
-from aiogram import Router, F, Bot
-from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import StatesGroup, State
-from aiogram.types import CallbackQuery, Message
-from sqlalchemy.ext.asyncio import AsyncSession
-
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 from config import config
-from database import repo
-from database.models import ItemType
-from lexicons.texts import (
-    premium_menu, premium_enter_username, premium_confirm,
-    NOT_ENOUGH_BALANCE, PREMIUM_ORDER_PLACED,
-)
-from services.payment_service import process_purchase, complete_purchase, refund_purchase
-from services.fragment_service import (
-    get_premium_recipient, create_premium_order, FragmentAPIError
-)
-from utils.photo_utils import send_or_edit_photo, safe_edit
-
-logger = logging.getLogger(__name__)
-router = Router()
-
-PREMIUM_PRICES: dict[int, int] = {
-    3:  config.premium_3m_price,
-    6:  config.premium_6m_price,
-    12: config.premium_12m_price,
-}
 
 
-class PremiumState(StatesGroup):
-    waiting_recipient = State()
+# ─── MAIN MENU ───────────────────────────────────────────────────────────────
 
-
-@router.callback_query(F.data == "menu:premium")
-async def cb_premium_menu(callback: CallbackQuery, state: FSMContext) -> None:
-    await state.clear()
-    await send_or_edit_photo(
-        event=callback,
-        photo_id=config.photo_id_premium,
-        photo_unique_id=config.photo_unique_id_premium,
-        text=premium_menu(),
-        reply_markup=premium_menu_kb(),
+def main_menu_kb() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(text="🌟 Купить Stars", callback_data="menu:stars"),
+        InlineKeyboardButton(text="💎 Купить Premium", callback_data="menu:premium"),
     )
-    await callback.answer()
-
-
-@router.callback_query(F.data.startswith("premium:"))
-async def cb_premium_select(callback: CallbackQuery, state: FSMContext) -> None:
-    months = int(callback.data.split(":")[1])
-    price = float(PREMIUM_PRICES[months])
-    await state.update_data(premium_months=months, premium_price=price)
-    await state.set_state(PremiumState.waiting_recipient)
-    await safe_edit(
-        callback.message,
-        text=(
-            f"💎 <b>Telegram Premium {months} мес.</b> — {price:.0f} руб.\n\n"
-            "✏️ <b>Кому подарить Premium?</b>\n\n"
-            "Нажмите <b>«Себе»</b> или введите <code>@username</code> / UID:"
-        ),
-        reply_markup=premium_recipient_kb(months, callback.from_user.id),
-        parse_mode="HTML",
+    builder.row(InlineKeyboardButton(text="🎁 Удалённые подарки", callback_data="menu:gift_regular"))
+    builder.row(InlineKeyboardButton(text="🌐 Купить VPN", callback_data="menu:vpn"))
+    builder.row(
+        InlineKeyboardButton(text="👤 Профиль", callback_data="menu:profile"),
+        InlineKeyboardButton(text="🤝 Партнёрская сеть", callback_data="menu:referral"),
     )
-    await callback.answer()
+    builder.row(InlineKeyboardButton(text="🆘 Поддержка", callback_data="menu:support"))
+    builder.row(InlineKeyboardButton(text="▶️ Старт / Меню", callback_data="menu:start"))
+    return builder.as_markup()
 
 
-# ─── Кнопка «Себе» для Premium ───────────────────────────────────────────────
+# ─── NAV ─────────────────────────────────────────────────────────────────────
 
-@router.callback_query(F.data.startswith("premium_self:"))
-async def cb_premium_self(callback: CallbackQuery, state: FSMContext) -> None:
-    parts = callback.data.split(":", 2)
-    months = int(parts[1])
-    recipient = str(callback.from_user.id)
-    price = float(PREMIUM_PRICES[months])
-    await state.clear()
-    await safe_edit(
-        callback.message,
-        text=premium_confirm(months, price, "вам (себе)"),
-        reply_markup=premium_confirm_kb(months, recipient),
-        parse_mode="HTML",
+def back_to_main_kb() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🔙 Главное меню", callback_data="menu:main")
+    return builder.as_markup()
+
+
+def back_button(callback: str, label: str = "🔙 Назад") -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text=label, callback_data=callback)
+    return builder.as_markup()
+
+
+def not_enough_balance_kb(needed: int) -> InlineKeyboardMarkup:
+    """Кнопка редиректа на пополнение нужной суммы."""
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(
+        text=f"💳 Пополнить на {needed} руб.",
+        callback_data=f"topup:{needed}",
+    ))
+    builder.row(InlineKeyboardButton(text="🔙 Главное меню", callback_data="menu:main"))
+    return builder.as_markup()
+
+
+# ─── STARS ───────────────────────────────────────────────────────────────────
+
+def stars_menu_kb() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    tiers = [
+        (50,    config.stars_50_price),
+        (100,   config.stars_100_price),
+        (150,   config.stars_150_price),
+        (250,   config.stars_250_price),
+        (350,   config.stars_350_price),
+        (500,   config.stars_500_price),
+        (750,   config.stars_750_price),
+        (1000,  config.stars_1000_price),
+        (1500,  config.stars_1500_price),
+        (2500,  config.stars_2500_price),
+        (5000,  config.stars_5000_price),
+        (10000, config.stars_10000_price),
+    ]
+    for i in range(0, len(tiers), 2):
+        row = [
+            InlineKeyboardButton(
+                text=f"⭐ {amount} — {price} руб.",
+                callback_data=f"stars:{amount}",
+            )
+            for amount, price in tiers[i:i+2]
+        ]
+        builder.row(*row)
+    builder.row(InlineKeyboardButton(text="⭐ Свой вариант", callback_data="stars:custom"))
+    builder.row(InlineKeyboardButton(text="🔙 Назад", callback_data="menu:main"))
+    return builder.as_markup()
+
+
+def stars_recipient_kb(amount: int, self_user_id: int) -> InlineKeyboardMarkup:
+    """Клавиатура для выбора получателя Stars — с кнопкой «Себе»."""
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(
+        text="🙋 Себе",
+        callback_data=f"stars_self:{amount}:{self_user_id}",
+    ))
+    builder.row(InlineKeyboardButton(text="🔙 Назад", callback_data="menu:stars"))
+    return builder.as_markup()
+
+
+def stars_confirm_kb(amount: int, recipient: str) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(text="✅ Подтвердить", callback_data=f"stars_confirm:{amount}:{recipient}"),
+        InlineKeyboardButton(text="❌ Отмена", callback_data="menu:stars"),
     )
-    await callback.answer()
+    return builder.as_markup()
 
 
-@router.message(PremiumState.waiting_recipient)
-async def msg_premium_recipient(message: Message, state: FSMContext) -> None:
-    recipient = message.text.strip()
-    data = await state.get_data()
-    months = data["premium_months"]
-    price = data["premium_price"]
-    await state.clear()
-    await message.answer(
-        text=premium_confirm(months, price, recipient),
-        reply_markup=premium_confirm_kb(months, recipient),
-        parse_mode="HTML",
+# ─── PREMIUM ─────────────────────────────────────────────────────────────────
+
+def premium_menu_kb() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text=f"📅 3 месяца — {config.premium_3m_price} руб.", callback_data="premium:3"))
+    builder.row(InlineKeyboardButton(text=f"📅 6 месяцев — {config.premium_6m_price} руб.", callback_data="premium:6"))
+    builder.row(InlineKeyboardButton(text=f"📅 12 месяцев — {config.premium_12m_price} руб.", callback_data="premium:12"))
+    builder.row(InlineKeyboardButton(text="🔙 Назад", callback_data="menu:main"))
+    return builder.as_markup()
+
+
+def premium_recipient_kb(months: int, self_user_id: int) -> InlineKeyboardMarkup:
+    """Клавиатура для выбора получателя Premium — с кнопкой «Себе»."""
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(
+        text="🙋 Себе",
+        callback_data=f"premium_self:{months}:{self_user_id}",
+    ))
+    builder.row(InlineKeyboardButton(text="🔙 Назад", callback_data="menu:premium"))
+    return builder.as_markup()
+
+
+def premium_confirm_kb(months: int, recipient: str) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(text="✅ Подтвердить", callback_data=f"premium_confirm:{months}:{recipient}"),
+        InlineKeyboardButton(text="❌ Отмена", callback_data="menu:premium"),
     )
+    return builder.as_markup()
 
 
-@router.callback_query(F.data.startswith("premium_confirm:"))
-async def cb_premium_confirm(
-    callback: CallbackQuery, session: AsyncSession, bot: Bot
-) -> None:
-    _, months_str, recipient = callback.data.split(":", 2)
-    months = int(months_str)
-    price = float(PREMIUM_PRICES[months])
-    user_id = callback.from_user.id
+# ─── GIFTS ───────────────────────────────────────────────────────────────────
 
-    # Проверяем баланс заранее
-    user = await repo.get_user(session, user_id)
-    if not user or user.balance < price:
-        needed = max(int(price - (user.balance if user else 0)), 10)
-        await safe_edit(
-            callback.message,
-            text=(
-                "❌ <b>Недостаточно средств!</b>\n\n"
-                f"Нужно: <b>{price:.0f} руб.</b>\n"
-                f"На балансе: <b>{user.balance:.0f if user else 0} руб.</b>\n\n"
-                f"Пополните баланс на <b>{needed} руб.</b> и попробуйте снова."
-            ),
-            reply_markup=not_enough_balance_kb(needed),
-            parse_mode="HTML",
-        )
-        await callback.answer()
-        return
+def gift_list_kb(tg_gifts: list) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    buttons = []
+    for g in tg_gifts:
+        limited = f" [{g['remaining_count']}шт]" if g.get("total_count") else ""
+        buttons.append(InlineKeyboardButton(
+            text=f"{g['sticker_emoji']} {g['star_count']}⭐{limited}",
+            callback_data=f"gift_select:{g['id']}",
+        ))
+    for i in range(0, len(buttons), 2):
+        builder.row(*buttons[i:i + 2])
+    builder.row(InlineKeyboardButton(text="⬅️ Назад", callback_data="menu:main"))
+    return builder.as_markup()
 
-    order_id = await process_purchase(
-        session=session,
-        user_id=user_id,
-        item_type=ItemType.PREMIUM,
-        item_detail=f"Premium {months}m → {recipient}",
-        price=price,
-        description=f"Telegram Premium {months} мес.",
+
+def gift_confirm_kb(gift_tg_id: str, recipient: str) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(text="✅ Подтвердить", callback_data=f"gift_confirm:{gift_tg_id}:{recipient}"),
+        InlineKeyboardButton(text="❌ Отмена", callback_data="menu:main"),
     )
-    if order_id is None:
-        needed = max(int(price), 10)
-        await safe_edit(
-            callback.message,
-            text="❌ <b>Недостаточно средств!</b>",
-            reply_markup=not_enough_balance_kb(needed),
-            parse_mode="HTML",
-        )
-        await callback.answer()
-        return
+    return builder.as_markup()
 
-    await callback.answer("⏳ Отправляем заказ на Fragment...")
 
-    if config.fragment_api_key:
-        try:
-            recipient_info = await get_premium_recipient(recipient, months)
-            fragment_order = await create_premium_order(
-                username=recipient,
-                recipient_hash=recipient_info.recipient_hash,
-                months=months,
-            )
-            from database.models import Order
-            from sqlalchemy import select
-            result = await session.execute(select(Order).where(Order.id == order_id))
-            order = result.scalar_one()
-            order.delivery_data = fragment_order.order_id
-            await session.commit()
+# ─── VPN ─────────────────────────────────────────────────────────────────────
 
-            await safe_edit(callback.message,
-                text=(
-                    f"✅ <b>Заказ #{order_id} отправлен!</b>\n\n"
-                    f"💎 <b>Premium {months} мес.</b> → <code>{recipient}</code>\n\n"
-                    "Доставка обычно занимает 1–3 минуты.\n"
-                    "Вы получите уведомление, когда подписка будет активирована."
-                ),
-                reply_markup=main_menu_kb(),
-                parse_mode="HTML",
-            )
+def vpn_menu_kb() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text=f"🚀 1 месяц — {config.vpn_1m_price} руб.", callback_data="vpn:30"))
+    builder.row(InlineKeyboardButton(text=f"🚀 3 месяца — {config.vpn_3m_price} руб.", callback_data="vpn:90"))
+    builder.row(InlineKeyboardButton(text=f"🚀 6 месяцев — {config.vpn_6m_price} руб.", callback_data="vpn:180"))
+    builder.row(InlineKeyboardButton(text="❓ Инструкция по настройке", callback_data="vpn:instruction"))
+    builder.row(InlineKeyboardButton(text="🔙 Назад", callback_data="menu:main"))
+    return builder.as_markup()
 
-        except FragmentAPIError as e:
-            logger.error(f"Fragment API error for order {order_id}: {e}")
-            await refund_purchase(session, order_id, user_id, price)
-            await safe_edit(callback.message,
-                text=(
-                    f"❌ <b>Ошибка при отправке заказа:</b> {e}\n\n"
-                    f"💳 <b>{price:.2f} руб. возвращены на ваш баланс.</b>"
-                ),
-                reply_markup=main_menu_kb(),
-                parse_mode="HTML",
-            )
-        except Exception as e:
-            logger.error(f"Unexpected error for order {order_id}: {e}")
-            try:
-                from keyboards.inline import admin_order_notify_kb
-                await bot.send_message(
-                    chat_id=config.admin_id,
-                    text=(
-                        f"⚠️ <b>Ошибка Fragment API — заказ #{order_id}</b>\n\n"
-                        f"Товар: 💎 Premium {months}м → <code>{recipient}</code>\n"
-                        f"Покупатель: <code>{user_id}</code>\n"
-                        f"Ошибка: {e}"
-                    ),
-                    reply_markup=admin_order_notify_kb(order_id),
-                    parse_mode="HTML",
-                )
-            except Exception:
-                pass
-            await safe_edit(callback.message,
-                text=PREMIUM_ORDER_PLACED(months, recipient),
-                reply_markup=main_menu_kb(),
-                parse_mode="HTML",
-            )
-    else:
-        try:
-            from keyboards.inline import admin_order_notify_kb
-            await bot.send_message(
-                chat_id=config.admin_id,
-                text=(
-                    f"📦 <b>Новый заказ #{order_id}</b>\n\n"
-                    f"Товар: 💎 Telegram Premium {months} мес.\n"
-                    f"Получатель: <code>{recipient}</code>\n"
-                    f"Сумма: <b>{price:.2f} руб.</b>\n"
-                    f"Покупатель ID: <code>{user_id}</code>"
-                ),
-                reply_markup=admin_order_notify_kb(order_id),
-                parse_mode="HTML",
-            )
-        except Exception as e:
-            logger.error(f"Failed to notify admin: {e}")
-        await complete_purchase(session, order_id, f"Recipient: {recipient}")
-        await safe_edit(callback.message,
-            text=PREMIUM_ORDER_PLACED(months, recipient),
-            reply_markup=main_menu_kb(),
-            parse_mode="HTML",
-        )
+
+# ─── PROFILE ─────────────────────────────────────────────────────────────────
+
+def profile_kb() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="➕ Пополнить баланс", callback_data="profile:topup"))
+    builder.row(InlineKeyboardButton(text="📜 История покупок", callback_data="profile:orders"))
+    builder.row(InlineKeyboardButton(text="🔙 Главное меню", callback_data="menu:main"))
+    return builder.as_markup()
+
+
+def topup_kb() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(text="💵 100 руб.", callback_data="topup:100"),
+        InlineKeyboardButton(text="💵 500 руб.", callback_data="topup:500"),
+        InlineKeyboardButton(text="💵 1000 руб.", callback_data="topup:1000"),
+    )
+    builder.row(
+        InlineKeyboardButton(text="💵 2000 руб.", callback_data="topup:2000"),
+        InlineKeyboardButton(text="💵 5000 руб.", callback_data="topup:5000"),
+    )
+    builder.row(InlineKeyboardButton(text="🔙 Назад в профиль", callback_data="menu:profile"))
+    return builder.as_markup()
+
+
+def topup_method_kb(amount: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="💳 Карта / СБП (FreeKassa)", callback_data=f"topup_fk:{amount}"))
+    builder.row(InlineKeyboardButton(text="🏦 СБП (Lava)", callback_data=f"topup_lava:{amount}"))
+    builder.row(InlineKeyboardButton(text="💎 TON (CryptoBot)", callback_data=f"topup_ton:{amount}"))
+    builder.row(InlineKeyboardButton(text="🔙 Назад", callback_data="profile:topup"))
+    return builder.as_markup()
+
+
+def topup_confirm_kb(amount: int) -> InlineKeyboardMarkup:
+    return topup_method_kb(amount)
+
+
+# ─── REFERRAL ────────────────────────────────────────────────────────────────
+
+def referral_kb() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="💰 Вывести заработанное", callback_data="referral:withdraw"))
+    builder.row(InlineKeyboardButton(text="🔙 Главное меню", callback_data="menu:main"))
+    return builder.as_markup()
+
+
+# ─── SUPPORT ─────────────────────────────────────────────────────────────────
+
+def support_kb(support_username: str) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="🧑‍💻 Связаться с оператором", url=f"https://t.me/{support_username}"))
+    builder.row(InlineKeyboardButton(text="🔙 Главное меню", callback_data="menu:main"))
+    return builder.as_markup()
+
+
+# ─── ADMIN ───────────────────────────────────────────────────────────────────
+
+def admin_order_notify_kb(order_id: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(text="✅ Выполнить", callback_data=f"admin_complete:{order_id}"),
+        InlineKeyboardButton(text="❌ Отклонить", callback_data=f"admin_fail:{order_id}"),
+    )
+    return builder.as_markup()
