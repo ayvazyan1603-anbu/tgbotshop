@@ -9,7 +9,8 @@ from config import config
 from database import repo
 from database.models import ItemType
 from keyboards.inline import (
-    premium_menu_kb, premium_confirm_kb, main_menu_kb, back_button
+    premium_menu_kb, premium_confirm_kb, premium_recipient_kb,
+    main_menu_kb, back_button, not_enough_balance_kb,
 )
 from lexicons.texts import (
     premium_menu, premium_enter_username, premium_confirm,
@@ -54,9 +55,32 @@ async def cb_premium_select(callback: CallbackQuery, state: FSMContext) -> None:
     price = float(PREMIUM_PRICES[months])
     await state.update_data(premium_months=months, premium_price=price)
     await state.set_state(PremiumState.waiting_recipient)
-    await safe_edit(callback.message, 
-        text=premium_enter_username(),
-        reply_markup=back_button("menu:premium"),
+    await safe_edit(
+        callback.message,
+        text=(
+            f"💎 <b>Telegram Premium {months} мес.</b> — {price:.0f} руб.\n\n"
+            "✏️ <b>Кому подарить Premium?</b>\n\n"
+            "Нажмите <b>«Себе»</b> или введите <code>@username</code> / UID:"
+        ),
+        reply_markup=premium_recipient_kb(months, callback.from_user.id),
+        parse_mode="HTML",
+    )
+    await callback.answer()
+
+
+# ─── Кнопка «Себе» для Premium ───────────────────────────────────────────────
+
+@router.callback_query(F.data.startswith("premium_self:"))
+async def cb_premium_self(callback: CallbackQuery, state: FSMContext) -> None:
+    parts = callback.data.split(":", 2)
+    months = int(parts[1])
+    recipient = str(callback.from_user.id)
+    price = float(PREMIUM_PRICES[months])
+    await state.clear()
+    await safe_edit(
+        callback.message,
+        text=premium_confirm(months, price, "вам (себе)"),
+        reply_markup=premium_confirm_kb(months, recipient),
         parse_mode="HTML",
     )
     await callback.answer()
@@ -85,6 +109,24 @@ async def cb_premium_confirm(
     price = float(PREMIUM_PRICES[months])
     user_id = callback.from_user.id
 
+    # Проверяем баланс заранее
+    user = await repo.get_user(session, user_id)
+    if not user or user.balance < price:
+        needed = max(int(price - (user.balance if user else 0)), 10)
+        await safe_edit(
+            callback.message,
+            text=(
+                "❌ <b>Недостаточно средств!</b>\n\n"
+                f"Нужно: <b>{price:.0f} руб.</b>\n"
+                f"На балансе: <b>{user.balance:.0f if user else 0} руб.</b>\n\n"
+                f"Пополните баланс на <b>{needed} руб.</b> и попробуйте снова."
+            ),
+            reply_markup=not_enough_balance_kb(needed),
+            parse_mode="HTML",
+        )
+        await callback.answer()
+        return
+
     order_id = await process_purchase(
         session=session,
         user_id=user_id,
@@ -94,9 +136,11 @@ async def cb_premium_confirm(
         description=f"Telegram Premium {months} мес.",
     )
     if order_id is None:
-        await safe_edit(callback.message, 
-            text=NOT_ENOUGH_BALANCE,
-            reply_markup=main_menu_kb(),
+        needed = max(int(price), 10)
+        await safe_edit(
+            callback.message,
+            text="❌ <b>Недостаточно средств!</b>",
+            reply_markup=not_enough_balance_kb(needed),
             parse_mode="HTML",
         )
         await callback.answer()
@@ -119,7 +163,7 @@ async def cb_premium_confirm(
             order.delivery_data = fragment_order.order_id
             await session.commit()
 
-            await safe_edit(callback.message, 
+            await safe_edit(callback.message,
                 text=(
                     f"✅ <b>Заказ #{order_id} отправлен!</b>\n\n"
                     f"💎 <b>Premium {months} мес.</b> → <code>{recipient}</code>\n\n"
@@ -133,7 +177,7 @@ async def cb_premium_confirm(
         except FragmentAPIError as e:
             logger.error(f"Fragment API error for order {order_id}: {e}")
             await refund_purchase(session, order_id, user_id, price)
-            await safe_edit(callback.message, 
+            await safe_edit(callback.message,
                 text=(
                     f"❌ <b>Ошибка при отправке заказа:</b> {e}\n\n"
                     f"💳 <b>{price:.2f} руб. возвращены на ваш баланс.</b>"
@@ -158,13 +202,12 @@ async def cb_premium_confirm(
                 )
             except Exception:
                 pass
-            await safe_edit(callback.message, 
+            await safe_edit(callback.message,
                 text=PREMIUM_ORDER_PLACED(months, recipient),
                 reply_markup=main_menu_kb(),
                 parse_mode="HTML",
             )
     else:
-        # Ручная обработка
         try:
             from keyboards.inline import admin_order_notify_kb
             await bot.send_message(
@@ -182,7 +225,7 @@ async def cb_premium_confirm(
         except Exception as e:
             logger.error(f"Failed to notify admin: {e}")
         await complete_purchase(session, order_id, f"Recipient: {recipient}")
-        await safe_edit(callback.message, 
+        await safe_edit(callback.message,
             text=PREMIUM_ORDER_PLACED(months, recipient),
             reply_markup=main_menu_kb(),
             parse_mode="HTML",
