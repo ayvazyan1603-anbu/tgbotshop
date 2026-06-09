@@ -15,7 +15,7 @@ from lexicons.texts import (
     BALANCE_UPDATED, INVALID_AMOUNT,
 )
 from services.payment_service import credit_balance
-from utils.photo_utils import send_or_edit_photo
+from utils.photo_utils import send_or_edit_photo, safe_edit
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -48,7 +48,7 @@ async def cb_profile(callback: CallbackQuery, session: AsyncSession) -> None:
 @router.callback_query(F.data == "profile:orders")
 async def cb_orders_history(callback: CallbackQuery, session: AsyncSession) -> None:
     orders = await repo.get_user_orders(session, callback.from_user.id)
-    await callback.message.edit_text(
+    await safe_edit(callback.message, 
         text=orders_history(orders),
         reply_markup=back_button("menu:profile"),
         parse_mode="HTML",
@@ -61,7 +61,7 @@ async def cb_orders_history(callback: CallbackQuery, session: AsyncSession) -> N
 @router.callback_query(F.data == "profile:topup")
 async def cb_topup_menu(callback: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(TopupState.waiting_custom_amount)
-    await callback.message.edit_text(
+    await safe_edit(callback.message, 
         text=(
             "💳 <b>Пополнение баланса</b>\n\n"
             "Введите сумму в рублях или выберите готовый вариант.\n\n"
@@ -81,7 +81,7 @@ async def cb_topup_menu(callback: CallbackQuery, state: FSMContext) -> None:
 async def cb_topup_preset(callback: CallbackQuery, state: FSMContext) -> None:
     amount = int(callback.data.split(":")[1])
     await state.clear()
-    await callback.message.edit_text(
+    await safe_edit(callback.message, 
         text=(
             f"💳 <b>Пополнение на {amount} руб.</b>\n\n"
             "Выберите способ оплаты:"
@@ -144,7 +144,7 @@ async def cb_topup_lava(callback: CallbackQuery, bot: Bot) -> None:
         builder.row(InlineKeyboardButton(
             text="🔙 Назад", callback_data="profile:topup"
         ))
-        await callback.message.edit_text(
+        await safe_edit(callback.message, 
             text=(
                 f"🏦 <b>Оплата через СБП</b>\n\n"
                 f"Сумма: <b>{amount} руб.</b>\n"
@@ -157,7 +157,7 @@ async def cb_topup_lava(callback: CallbackQuery, bot: Bot) -> None:
         )
     except Exception as e:
         logger.error(f"Lava invoice error: {e}")
-        await callback.message.edit_text(
+        await safe_edit(callback.message, 
             text=f"❌ <b>Ошибка создания счёта:</b> {e}\n\nПопробуйте позже.",
             reply_markup=back_button("profile:topup"),
             parse_mode="HTML",
@@ -193,7 +193,7 @@ async def cb_topup_ton(callback: CallbackQuery) -> None:
         builder.row(InlineKeyboardButton(
             text="🔙 Назад", callback_data="profile:topup"
         ))
-        await callback.message.edit_text(
+        await safe_edit(callback.message, 
             text=(
                 f"💎 <b>Оплата через TON</b>\n\n"
                 f"Сумма в рублях: <b>{amount} руб.</b>\n"
@@ -207,7 +207,7 @@ async def cb_topup_ton(callback: CallbackQuery) -> None:
         )
     except Exception as e:
         logger.error(f"CryptoBot invoice error: {e}")
-        await callback.message.edit_text(
+        await safe_edit(callback.message, 
             text=f"❌ <b>Ошибка создания инвойса:</b> {e}\n\nПопробуйте позже.",
             reply_markup=back_button("profile:topup"),
             parse_mode="HTML",
