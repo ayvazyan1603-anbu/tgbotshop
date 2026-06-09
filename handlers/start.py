@@ -65,3 +65,22 @@ async def cb_main_menu(callback: CallbackQuery, session: AsyncSession) -> None:
         reply_markup=main_menu_kb(),
     )
     await callback.answer()
+
+@router.callback_query(F.data == "menu:start")
+async def cb_menu_start(callback: CallbackQuery, session: AsyncSession) -> None:
+    """Кнопка 'Меню / Старт' — перезапускает главное меню как /start."""
+    user, _ = await repo.get_or_create_user(
+        session=session,
+        user_id=callback.from_user.id,
+        username=callback.from_user.username,
+        full_name=callback.from_user.full_name,
+        referrer_id=None,
+    )
+    await send_or_edit_photo(
+        event=callback,
+        photo_id=config.photo_id_main,
+        photo_unique_id=config.photo_unique_id_main,
+        text=main_menu(user.balance),
+        reply_markup=main_menu_kb(),
+    )
+    await callback.answer()
