@@ -9,7 +9,8 @@ from config import config
 from database import repo
 from database.models import ItemType
 from keyboards.inline import (
-    stars_menu_kb, stars_confirm_kb, main_menu_kb, back_button
+    stars_menu_kb, stars_confirm_kb, stars_recipient_kb,
+    main_menu_kb, back_button, not_enough_balance_kb,
 )
 from lexicons.texts import (
     stars_menu, stars_enter_username, stars_custom_amount, stars_confirm,
@@ -73,9 +74,14 @@ async def cb_stars_select(callback: CallbackQuery, state: FSMContext) -> None:
     price = calc_stars_price(amount)
     await state.update_data(stars_amount=amount, stars_price=price)
     await state.set_state(StarsState.waiting_recipient)
-    await safe_edit(callback.message, 
-        text=stars_enter_username(),
-        reply_markup=back_button("menu:stars"),
+    await safe_edit(
+        callback.message,
+        text=(
+            f"⭐ <b>{amount} Stars</b> — {price:.0f} руб.\n\n"
+            "✏️ <b>Кому отправить Stars?</b>\n\n"
+            "Нажмите <b>«Себе»</b> или введите <code>@username</code> / UID:"
+        ),
+        reply_markup=stars_recipient_kb(amount, callback.from_user.id),
         parse_mode="HTML",
     )
     await callback.answer()
@@ -84,7 +90,7 @@ async def cb_stars_select(callback: CallbackQuery, state: FSMContext) -> None:
 @router.callback_query(F.data == "stars:custom")
 async def cb_stars_custom(callback: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(StarsState.waiting_custom_amount)
-    await safe_edit(callback.message, 
+    await safe_edit(callback.message,
         text=stars_custom_amount(),
         reply_markup=back_button("menu:stars"),
         parse_mode="HTML",
@@ -105,10 +111,32 @@ async def msg_stars_custom_amount(message: Message, state: FSMContext) -> None:
     await state.update_data(stars_amount=amount, stars_price=price)
     await state.set_state(StarsState.waiting_recipient_after_custom)
     await message.answer(
-        text=stars_enter_username(),
-        reply_markup=back_button("menu:stars"),
+        text=(
+            f"⭐ <b>{amount} Stars</b> — {price:.0f} руб.\n\n"
+            "✏️ <b>Кому отправить Stars?</b>\n\n"
+            "Нажмите <b>«Себе»</b> или введите <code>@username</code> / UID:"
+        ),
+        reply_markup=stars_recipient_kb(amount, message.from_user.id),
         parse_mode="HTML",
     )
+
+
+# ─── Кнопка «Себе» для Stars ─────────────────────────────────────────────────
+
+@router.callback_query(F.data.startswith("stars_self:"))
+async def cb_stars_self(callback: CallbackQuery, state: FSMContext) -> None:
+    parts = callback.data.split(":", 2)
+    amount = int(parts[1])
+    recipient = str(callback.from_user.id)
+    price = calc_stars_price(amount)
+    await state.clear()
+    await safe_edit(
+        callback.message,
+        text=stars_confirm(amount, price, "вам (себе)"),
+        reply_markup=stars_confirm_kb(amount, recipient),
+        parse_mode="HTML",
+    )
+    await callback.answer()
 
 
 async def _handle_recipient(message: Message, state: FSMContext) -> None:
@@ -143,7 +171,24 @@ async def cb_stars_confirm(
     price = calc_stars_price(amount)
     user_id = callback.from_user.id
 
-    # 1. Создать заказ и списать баланс
+    # Проверяем баланс заранее
+    user = await repo.get_user(session, user_id)
+    if not user or user.balance < price:
+        needed = max(int(price - (user.balance if user else 0)), 10)
+        await safe_edit(
+            callback.message,
+            text=(
+                "❌ <b>Недостаточно средств!</b>\n\n"
+                f"Нужно: <b>{price:.0f} руб.</b>\n"
+                f"На балансе: <b>{user.balance:.0f if user else 0} руб.</b>\n\n"
+                f"Пополните баланс на <b>{needed} руб.</b> и попробуйте снова."
+            ),
+            reply_markup=not_enough_balance_kb(needed),
+            parse_mode="HTML",
+        )
+        await callback.answer()
+        return
+
     order_id = await process_purchase(
         session=session,
         user_id=user_id,
@@ -153,9 +198,11 @@ async def cb_stars_confirm(
         description=f"Покупка {amount} Stars",
     )
     if order_id is None:
-        await safe_edit(callback.message, 
-            text=NOT_ENOUGH_BALANCE,
-            reply_markup=main_menu_kb(),
+        needed = max(int(price), 10)
+        await safe_edit(
+            callback.message,
+            text="❌ <b>Недостаточно средств!</b>",
+            reply_markup=not_enough_balance_kb(needed),
             parse_mode="HTML",
         )
         await callback.answer()
@@ -163,7 +210,6 @@ async def cb_stars_confirm(
 
     await callback.answer("⏳ Отправляем заказ на Fragment...")
 
-    # 2. Проверить получателя через Fragment API (если ключ задан)
     if config.fragment_api_key:
         try:
             recipient_info = await get_star_recipient(recipient, amount)
@@ -172,7 +218,6 @@ async def cb_stars_confirm(
                 recipient_hash=recipient_info.recipient_hash,
                 quantity=amount,
             )
-            # Сохранить fragment order_id в delivery_data для вебхука
             from database.models import Order
             from sqlalchemy import select
             result = await session.execute(select(Order).where(Order.id == order_id))
@@ -180,7 +225,7 @@ async def cb_stars_confirm(
             order.delivery_data = fragment_order.order_id
             await session.commit()
 
-            await safe_edit(callback.message, 
+            await safe_edit(callback.message,
                 text=(
                     f"✅ <b>Заказ #{order_id} отправлен!</b>\n\n"
                     f"⭐ <b>{amount} Stars</b> → <code>{recipient}</code>\n\n"
@@ -194,7 +239,7 @@ async def cb_stars_confirm(
         except FragmentAPIError as e:
             logger.error(f"Fragment API error for order {order_id}: {e}")
             await refund_purchase(session, order_id, user_id, price)
-            await safe_edit(callback.message, 
+            await safe_edit(callback.message,
                 text=(
                     f"❌ <b>Ошибка при отправке заказа:</b> {e}\n\n"
                     f"💳 <b>{price:.2f} руб. возвращены на ваш баланс.</b>\n\n"
@@ -205,7 +250,6 @@ async def cb_stars_confirm(
             )
         except Exception as e:
             logger.error(f"Unexpected error for order {order_id}: {e}")
-            # Уведомить админа, не делать рефанд — разберётся вручную
             try:
                 from keyboards.inline import admin_order_notify_kb
                 await bot.send_message(
@@ -221,13 +265,12 @@ async def cb_stars_confirm(
                 )
             except Exception:
                 pass
-            await safe_edit(callback.message, 
+            await safe_edit(callback.message,
                 text=STARS_ORDER_PLACED(amount, recipient),
                 reply_markup=main_menu_kb(),
                 parse_mode="HTML",
             )
     else:
-        # Fragment API не настроен — ручная обработка администратором
         try:
             from keyboards.inline import admin_order_notify_kb
             await bot.send_message(
@@ -244,10 +287,9 @@ async def cb_stars_confirm(
             )
         except Exception as e:
             logger.error(f"Failed to notify admin: {e}")
-        from services.payment_service import complete_purchase
         await complete_purchase(session, order_id, f"Recipient: {recipient}")
-        await safe_edit(callback.message, 
+        await safe_edit(callback.message,
             text=STARS_ORDER_PLACED(amount, recipient),
             reply_markup=main_menu_kb(),
             parse_mode="HTML",
-                )
+        )
