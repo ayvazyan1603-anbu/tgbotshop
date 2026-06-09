@@ -100,14 +100,16 @@ def gift_enter_recipient() -> str:
     )
 
 
-def gift_list_text(recipient: str, gifts: list) -> str:
+def gift_list_text(recipient: str, tg_gifts: list) -> str:
     if recipient.startswith("@") or recipient.isdigit():
         display = recipient
     else:
         display = f"@{recipient.lstrip('@')}"
+
     lines = [f"🎁 <b>Выберите подарок для {display}:</b>\n"]
-    for i, gift in enumerate(gifts, 1):
-        lines.append(f"[{i}] — {gift.name}")
+    for g in tg_gifts:
+        limited = f" | осталось {g['remaining_count']} шт." if g.get("total_count") else ""
+        lines.append(f"{g['sticker_emoji']} {g['star_count']} ⭐{limited}")
     return "\n".join(lines)
 
 
