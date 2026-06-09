@@ -1,7 +1,6 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from config import config
-from database.models import Gift
 
 
 # ─── MAIN MENU ───────────────────────────────────────────────────────────────
@@ -99,36 +98,26 @@ def premium_confirm_kb(months: int, recipient: str) -> InlineKeyboardMarkup:
 
 # ─── GIFTS ───────────────────────────────────────────────────────────────────
 
-def _gift_stars(gift: Gift) -> str:
-    if gift.description:
-        return gift.description.split(" ", 1)[0]
-    return "50"
-
-
-def _gift_emoji(gift: Gift) -> str:
-    parts = gift.name.split(" ", 1)
-    return parts[0] if len(parts) > 1 else "🎁"
-
-
-def gift_list_kb(gifts: list) -> InlineKeyboardMarkup:
+def gift_list_kb(tg_gifts: list) -> InlineKeyboardMarkup:
+    """tg_gifts — список dict: {id, star_count, sticker_emoji, ...}"""
     builder = InlineKeyboardBuilder()
-    buttons = [
-        InlineKeyboardButton(
-            text=f"{_gift_emoji(gift)} [{i}] | {_gift_stars(gift)} ⭐",
-            callback_data=f"gift_select:{gift.id}",
-        )
-        for i, gift in enumerate(gifts, 1)
-    ]
+    buttons = []
+    for g in tg_gifts:
+        limited = f" [{g['remaining_count']}шт]" if g.get("total_count") else ""
+        buttons.append(InlineKeyboardButton(
+            text=f"{g['sticker_emoji']} {g['star_count']}⭐{limited}",
+            callback_data=f"gift_select:{g['id']}",
+        ))
     for i in range(0, len(buttons), 2):
         builder.row(*buttons[i:i + 2])
-    builder.row(InlineKeyboardButton(text="⬅️ Назад", callback_data="menu:gift_regular"))
+    builder.row(InlineKeyboardButton(text="⬅️ Назад", callback_data="menu:main"))
     return builder.as_markup()
 
 
-def gift_confirm_kb(gift_id: int, recipient: str) -> InlineKeyboardMarkup:
+def gift_confirm_kb(gift_tg_id: str, recipient: str) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.row(
-        InlineKeyboardButton(text="✅ Подтвердить", callback_data=f"gift_confirm:{gift_id}:{recipient}"),
+        InlineKeyboardButton(text="✅ Подтвердить", callback_data=f"gift_confirm:{gift_tg_id}:{recipient}"),
         InlineKeyboardButton(text="❌ Отмена", callback_data="menu:main"),
     )
     return builder.as_markup()
