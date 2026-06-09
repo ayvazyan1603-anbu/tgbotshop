@@ -8,10 +8,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from config import config
 from database import repo
 from database.models import ItemType
-from keyboards.inline import (
-    premium_menu_kb, premium_confirm_kb, premium_recipient_kb,
-    main_menu_kb, back_button, not_enough_balance_kb,
-)
 from lexicons.texts import (
     premium_menu, premium_enter_username, premium_confirm,
     NOT_ENOUGH_BALANCE, PREMIUM_ORDER_PLACED,
