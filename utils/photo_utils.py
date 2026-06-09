@@ -5,13 +5,44 @@ from aiogram.exceptions import TelegramBadRequest
 logger = logging.getLogger(__name__)
 
 
+async def safe_edit(
+    msg,
+    text: str,
+    reply_markup=None,
+    parse_mode: str = "HTML",
+    **kwargs,
+) -> None:
+    """
+    Безопасное редактирование сообщения.
+    Автоматически выбирает edit_caption (для фото) или edit_text (для текста).
+    Игнорирует ошибку «message is not modified».
+    """
+    try:
+        if msg.photo or msg.video or msg.document or msg.animation:
+            await msg.edit_caption(
+                caption=text,
+                reply_markup=reply_markup,
+                parse_mode=parse_mode,
+            )
+        else:
+            await msg.edit_text(
+                text=text,
+                reply_markup=reply_markup,
+                parse_mode=parse_mode,
+                **kwargs,
+            )
+    except TelegramBadRequest as e:
+        if "message is not modified" not in str(e):
+            logger.warning(f"safe_edit failed: {e}")
+
+
 async def send_or_edit_photo(
     event: Message | CallbackQuery,
     photo_id: str,
     text: str,
     reply_markup=None,
     parse_mode: str = "HTML",
-    photo_unique_id: str = "",   # передай PHOTO_UNIQUE_ID_* из .env для оптимизации
+    photo_unique_id: str = "",
 ) -> Message:
     """
     Если photo_unique_id передан — сравниваем с текущим фото:
@@ -21,7 +52,7 @@ async def send_or_edit_photo(
     """
     if not photo_id:
         if isinstance(event, CallbackQuery):
-            await event.message.edit_text(text, reply_markup=reply_markup, parse_mode=parse_mode)
+            await safe_edit(event.message, text, reply_markup=reply_markup, parse_mode=parse_mode)
             return event.message
         else:
             return await event.answer(text, reply_markup=reply_markup, parse_mode=parse_mode)
