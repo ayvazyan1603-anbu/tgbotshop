@@ -9,7 +9,7 @@ from config import config
 from database import repo
 from keyboards.inline import referral_kb, main_menu_kb, back_button
 from lexicons.texts import referral_text, WITHDRAWAL_REQUEST
-from utils.photo_utils import send_or_edit_photo
+from utils.photo_utils import send_or_edit_photo, safe_edit
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -67,7 +67,7 @@ async def cb_referral_withdraw(
         return
 
     await state.set_state(WithdrawState.waiting_amount)
-    await callback.message.edit_text(
+    await safe_edit(callback.message, 
         text=(
             f"💰 <b>Вывод средств</b>\n\n"
             f"Ваш текущий баланс: <b>{user.balance:.2f} руб.</b>\n"
