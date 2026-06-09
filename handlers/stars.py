@@ -19,7 +19,7 @@ from services.payment_service import process_purchase, complete_purchase, refund
 from services.fragment_service import (
     get_star_recipient, create_star_order, FragmentAPIError
 )
-from utils.photo_utils import send_or_edit_photo
+from utils.photo_utils import send_or_edit_photo, safe_edit
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -73,7 +73,7 @@ async def cb_stars_select(callback: CallbackQuery, state: FSMContext) -> None:
     price = calc_stars_price(amount)
     await state.update_data(stars_amount=amount, stars_price=price)
     await state.set_state(StarsState.waiting_recipient)
-    await callback.message.edit_text(
+    await safe_edit(callback.message, 
         text=stars_enter_username(),
         reply_markup=back_button("menu:stars"),
         parse_mode="HTML",
@@ -84,7 +84,7 @@ async def cb_stars_select(callback: CallbackQuery, state: FSMContext) -> None:
 @router.callback_query(F.data == "stars:custom")
 async def cb_stars_custom(callback: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(StarsState.waiting_custom_amount)
-    await callback.message.edit_text(
+    await safe_edit(callback.message, 
         text=stars_custom_amount(),
         reply_markup=back_button("menu:stars"),
         parse_mode="HTML",
@@ -153,7 +153,7 @@ async def cb_stars_confirm(
         description=f"Покупка {amount} Stars",
     )
     if order_id is None:
-        await callback.message.edit_text(
+        await safe_edit(callback.message, 
             text=NOT_ENOUGH_BALANCE,
             reply_markup=main_menu_kb(),
             parse_mode="HTML",
@@ -180,7 +180,7 @@ async def cb_stars_confirm(
             order.delivery_data = fragment_order.order_id
             await session.commit()
 
-            await callback.message.edit_text(
+            await safe_edit(callback.message, 
                 text=(
                     f"✅ <b>Заказ #{order_id} отправлен!</b>\n\n"
                     f"⭐ <b>{amount} Stars</b> → <code>{recipient}</code>\n\n"
@@ -194,7 +194,7 @@ async def cb_stars_confirm(
         except FragmentAPIError as e:
             logger.error(f"Fragment API error for order {order_id}: {e}")
             await refund_purchase(session, order_id, user_id, price)
-            await callback.message.edit_text(
+            await safe_edit(callback.message, 
                 text=(
                     f"❌ <b>Ошибка при отправке заказа:</b> {e}\n\n"
                     f"💳 <b>{price:.2f} руб. возвращены на ваш баланс.</b>\n\n"
@@ -221,7 +221,7 @@ async def cb_stars_confirm(
                 )
             except Exception:
                 pass
-            await callback.message.edit_text(
+            await safe_edit(callback.message, 
                 text=STARS_ORDER_PLACED(amount, recipient),
                 reply_markup=main_menu_kb(),
                 parse_mode="HTML",
@@ -246,8 +246,8 @@ async def cb_stars_confirm(
             logger.error(f"Failed to notify admin: {e}")
         from services.payment_service import complete_purchase
         await complete_purchase(session, order_id, f"Recipient: {recipient}")
-        await callback.message.edit_text(
+        await safe_edit(callback.message, 
             text=STARS_ORDER_PLACED(amount, recipient),
             reply_markup=main_menu_kb(),
             parse_mode="HTML",
-        )
+                )
