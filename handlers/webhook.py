@@ -93,63 +93,6 @@ async def fragment_webhook_handler(request: web.Request) -> web.Response:
     return web.Response(status=200, text="OK")
 
 
-# ─── LAVA WEBHOOK ────────────────────────────────────────────────────────────
-
-async def lava_webhook_handler(request: web.Request) -> web.Response:
-    """
-    Lava.ru отправляет POST с JSON при успешной оплате.
-    Поля: id, order_id, status, amount, custom_fields (наш user_id)
-    """
-    bot: Bot = request.app["bot"]
-    body = await request.read()
-
-    signature = request.headers.get("Signature", "")
-    if not verify_lava_webhook(body, signature):
-        logger.warning("Invalid Lava webhook signature")
-        return web.Response(status=403, text="Invalid signature")
-
-    try:
-        payload = json.loads(body)
-    except json.JSONDecodeError:
-        return web.Response(status=400, text="Invalid JSON")
-
-    status = payload.get("status")
-    if status != "success":
-        return web.Response(status=200, text="OK")  # игнорируем не-успешные
-
-    try:
-        amount = float(payload.get("amount", 0))
-        user_id = int(payload.get("custom_fields", 0))
-        if not user_id or amount <= 0:
-            raise ValueError("Missing user_id or amount")
-    except (ValueError, TypeError) as e:
-        logger.error(f"Lava webhook parse error: {e} | payload: {payload}")
-        return web.Response(status=200, text="OK")
-
-    async with async_session_factory() as session:
-        from services.payment_service import credit_balance
-        new_balance = await credit_balance(
-            session=session,
-            user_id=user_id,
-            amount=amount,
-            description=f"Пополнение через СБП (Lava) {amount:.2f} руб.",
-        )
-        try:
-            await bot.send_message(
-                chat_id=user_id,
-                text=(
-                    f"✅ <b>Баланс пополнен через СБП!</b>\n\n"
-                    f"Сумма: <b>+{amount:.2f} руб.</b>\n"
-                    f"Текущий баланс: <b>{new_balance:.2f} руб.</b>"
-                ),
-                reply_markup=main_menu_kb(),
-                parse_mode="HTML",
-            )
-        except Exception as e:
-            logger.error(f"Notify error: {e}")
-
-    return web.Response(status=200, text="OK")
-
 
 # ─── CRYPTOBOT WEBHOOK ───────────────────────────────────────────────────────
 
