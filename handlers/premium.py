@@ -74,7 +74,14 @@ async def cb_premium_select(callback: CallbackQuery, state: FSMContext) -> None:
 async def cb_premium_self(callback: CallbackQuery, state: FSMContext) -> None:
     parts = callback.data.split(":", 2)
     months = int(parts[1])
-    recipient = str(callback.from_user.id)
+    recipient = callback.from_user.username
+    if not recipient:
+        await callback.answer(
+            "❌ У вас нет username в Telegram. Установите его в настройках профиля.",
+            show_alert=True,
+        )
+        return
+    recipient = recipient.lstrip("@")
     price = float(PREMIUM_PRICES[months])
     await state.clear()
     await safe_edit(
