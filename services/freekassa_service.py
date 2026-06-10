@@ -22,7 +22,7 @@ from config import config
 logger = logging.getLogger(__name__)
 
 PAYMENT_URL = "https://pay.freekassa.ru/"
-API_BASE    = "https://api.freekassa.net/v1"
+API_BASE    = "https://api.freekassa.ru/v1"
 
 
 @dataclass
