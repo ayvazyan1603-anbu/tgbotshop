@@ -39,9 +39,14 @@ async def main() -> None:
     dp.update.middleware(DbSessionMiddleware())
     dp.include_router(setup_routers())
 
-    # Railway всегда передаёт PORT — используем его
-    port = int(os.environ.get("PORT", 8080))
+    # Регистрируем вебхук CryptoBot при старте
+    if config.cryptobot_token and config.app_url:
+        from services.cryptobot_service import register_webhook
+        await register_webhook(config.app_url)
+    else:
+        logger.warning("CryptoBot webhook NOT registered — set CRYPTOBOT_TOKEN and APP_URL in env")
 
+    port = int(os.environ.get("PORT", 8080))
     webhook_app = create_webhook_app(bot)
     runner = web.AppRunner(webhook_app)
     await runner.setup()

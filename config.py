@@ -12,6 +12,9 @@ class Config:
     admin_id: int
     support_username: str
 
+    # App URL (Railway public URL, нужен для вебхуков)
+    app_url: str  # например https://yourapp.up.railway.app
+
     # Database
     database_url: str
 
@@ -29,21 +32,21 @@ class Config:
     webhook_port: int
 
     # Lava.ru (СБП + карты)
-    lava_api_key: str          # API ключ из личного кабинета lava.ru
-    lava_secret_key: str       # Secret key для проверки подписи вебхука
-    lava_shop_id: str          # ID магазина в lava.ru
-    lava_verify_code: str      # lava-verify=xxx из верификации домена
+    lava_api_key: str
+    lava_secret_key: str
+    lava_shop_id: str
+    lava_verify_code: str
 
     # CryptoBot (TON + крипта)
-    cryptobot_token: str       # Токен от @CryptoBot → /pay
+    cryptobot_token: str
 
     # FreeKassa (карты, СБП, кошельки)
-    freekassa_shop_id: str     # ID магазина (MERCHANT_ID)
-    freekassa_secret1: str     # Секретное слово 1 (для формы оплаты)
-    freekassa_secret2: str     # Секретное слово 2 (для проверки вебхука)
-    freekassa_api_key: str     # API-ключ (для запросов к API)
+    freekassa_shop_id: str
+    freekassa_secret1: str
+    freekassa_secret2: str
+    freekassa_api_key: str
 
-    # Фото для разделов меню (file_id после загрузки через upload_photos.py)
+    # Фото для разделов меню
     photo_id_main:     str
     photo_id_stars:    str
     photo_id_premium:  str
@@ -52,7 +55,6 @@ class Config:
     photo_id_referral: str
     photo_id_support:  str
 
-    # file_unique_id для быстрого сравнения (не меняется никогда)
     photo_unique_id_main:     str
     photo_unique_id_stars:    str
     photo_unique_id_premium:  str
@@ -89,6 +91,7 @@ def load_config() -> Config:
         bot_token=getenv("BOT_TOKEN", ""),
         admin_id=int(getenv("ADMIN_ID", "0")),
         support_username=getenv("SUPPORT_USERNAME", "support"),
+        app_url=getenv("APP_URL", ""),          # ← добавить в Railway переменные
         database_url=getenv("DATABASE_URL", "sqlite+aiosqlite:///./shop.db"),
         referral_percent=int(getenv("REFERRAL_PERCENT", "10")),
         marzban_url=getenv("MARZBAN_URL", ""),
