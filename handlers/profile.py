@@ -115,55 +115,6 @@ async def msg_topup_custom(message: Message, state: FSMContext) -> None:
     )
 
 
-# ─── LAVA (СБП) ──────────────────────────────────────────────────────────────
-
-@router.callback_query(F.data.startswith("topup_lava:"))
-async def cb_topup_lava(callback: CallbackQuery, bot: Bot) -> None:
-    amount = int(callback.data.split(":")[1])
-    user_id = callback.from_user.id
-
-    if not config.lava_api_key:
-        await callback.answer("❌ СБП временно недоступен", show_alert=True)
-        return
-
-    await callback.answer("⏳ Создаём счёт...")
-
-    try:
-        from services.lava_service import create_invoice
-        invoice = await create_invoice(
-            amount=float(amount),
-            user_id=user_id,
-            comment=f"Пополнение баланса {amount} руб.",
-        )
-        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-        from aiogram.utils.keyboard import InlineKeyboardBuilder
-        builder = InlineKeyboardBuilder()
-        builder.row(InlineKeyboardButton(
-            text=f"🏦 Оплатить {amount} руб. через СБП",
-            url=invoice.url,
-        ))
-        builder.row(InlineKeyboardButton(
-            text="🔙 Назад", callback_data="profile:topup"
-        ))
-        await safe_edit(callback.message, 
-            text=(
-                f"🏦 <b>Оплата через СБП</b>\n\n"
-                f"Сумма: <b>{amount} руб.</b>\n"
-                f"Срок действия: <b>30 минут</b>\n\n"
-                "Нажмите кнопку ниже для перехода к оплате.\n"
-                "После оплаты баланс пополнится <b>автоматически</b>."
-            ),
-            reply_markup=builder.as_markup(),
-            parse_mode="HTML",
-        )
-    except Exception as e:
-        logger.error(f"Lava invoice error: {e}")
-        await safe_edit(callback.message, 
-            text=f"❌ <b>Ошибка создания счёта:</b> {e}\n\nПопробуйте позже.",
-            reply_markup=back_button("profile:topup"),
-            parse_mode="HTML",
-        )
-
 
 # ─── CRYPTOBOT (TON) ─────────────────────────────────────────────────────────
 
