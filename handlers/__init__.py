@@ -9,14 +9,14 @@ from handlers.profile import router as profile_router
 from handlers.referral import router as referral_router
 from handlers.support_admin import router as support_admin_router
 from handlers.admin import router as admin_router
+from handlers.admin_panel import router as admin_panel_router
 from handlers.stars_invoice import router as stars_invoice_router
-# и в setup_routers():
-
 
 
 def setup_routers() -> Router:
     main_router = Router()
-    main_router.include_router(admin_router)        # первым — чтобы /testbalance не перехватывался
+    main_router.include_router(admin_panel_router)  # первым — /admin и FSM панели
+    main_router.include_router(admin_router)        # /testbalance, /addbalance
     main_router.include_router(start_router)
     main_router.include_router(stars_router)
     main_router.include_router(premium_router)
