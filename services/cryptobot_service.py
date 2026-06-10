@@ -7,7 +7,6 @@ import hashlib
 import hmac
 import logging
 from dataclasses import dataclass
-from typing import Optional
 
 import aiohttp
 
@@ -24,6 +23,30 @@ class CryptoBotInvoice:
     url: str
     amount: float
     currency: str
+
+
+async def register_webhook(app_url: str) -> bool:
+    """
+    Регистрирует вебхук в CryptoBot.
+    Вызывается один раз при старте бота.
+    app_url — публичный URL Railway (например https://yourapp.up.railway.app)
+    """
+    webhook_url = f"{app_url.rstrip('/')}/webhook/cryptobot"
+    headers = {"Crypto-Pay-API-Token": config.cryptobot_token}
+    async with aiohttp.ClientSession() as session:
+        async with session.get(
+            f"{BASE_URL}/setWebhook",
+            params={"url": webhook_url},
+            headers=headers,
+            timeout=aiohttp.ClientTimeout(total=10),
+        ) as resp:
+            data = await resp.json()
+            if data.get("ok"):
+                logger.info(f"CryptoBot webhook registered: {webhook_url}")
+                return True
+            else:
+                logger.error(f"CryptoBot setWebhook failed: {data}")
+                return False
 
 
 async def create_invoice(amount_rub: float, user_id: int) -> CryptoBotInvoice:
