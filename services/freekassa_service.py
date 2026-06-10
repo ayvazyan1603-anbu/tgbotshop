@@ -1,6 +1,6 @@
 """
 FreeKassa — платёжный сервис (банковские карты, СБП, электронные кошельки).
-Документация: https://docs.freekassa.ru
+Документация: https://docs.freekassa.net
 
 Флоу:
   1. create_invoice()  — формируем ссылку на оплату с подписью
@@ -10,7 +10,6 @@ FreeKassa — платёжный сервис (банковские карты, 
 import hashlib
 import hmac
 import logging
-import time
 import uuid
 from dataclasses import dataclass
 from typing import Optional
@@ -33,17 +32,10 @@ class FreekassaInvoice:
     amount: float
 
 
-def _sign_form(shop_id: str, amount: float, secret1: str, order_id: str) -> str:
-    """
-    Подпись для формы оплаты по документации FreeKassa:
-      MD5(shop_id:amount:secret1:order_id)
-    Важно: amount передаётся как строка с двумя знаками после запятой.
-    """
-    raw = f"{shop_id}:{amount:.2f}:{secret1}:{order_id}"
-    logger.debug(f"[FREEKASSA] sign raw string: {raw!r}")
-    result = hashlib.md5(raw.encode("utf-8")).hexdigest()
-    logger.debug(f"[FREEKASSA] sign result: {result}")
-    return result
+def _sign_form(shop_id: str, amount: float, secret1: str, currency: str, order_id: str) -> str:
+    """Подпись для формы оплаты: MD5(shop_id:amount:secret1:currency:order_id)."""
+    raw = f"{shop_id}:{amount:.2f}:{secret1}:{currency}:{order_id}"
+    return hashlib.md5(raw.encode()).hexdigest()
 
 
 def _sign_api(params: dict, secret: str) -> str:
@@ -62,21 +54,11 @@ async def create_invoice(
     Сформировать ссылку на оплату через FreeKassa.
     Возвращает FreekassaInvoice с URL для редиректа пользователя.
     """
-    shop_id = config.freekassa_shop_id
-    secret1 = config.freekassa_secret1
+    shop_id  = config.freekassa_shop_id
+    secret1  = config.freekassa_secret1
+    order_id = f"topup_{user_id}_{uuid.uuid4().hex[:8]}"
 
-    # order_id: только цифры и латиница без подчёркиваний — максимальная совместимость
-    order_id = f"{int(time.time())}{user_id}"
-
-    logger.info(
-        f"[FREEKASSA] Creating invoice | shop_id={shop_id!r} "
-        f"amount={amount:.2f} currency={currency} order_id={order_id} user_id={user_id}"
-    )
-    logger.info(f"[FREEKASSA] secret1 prefix: {secret1[:4]!r}... len={len(secret1)}")
-
-    sign = _sign_form(shop_id, amount, secret1, order_id)
-
-    logger.info(f"[FREEKASSA] Generated sign: {sign}")
+    sign = _sign_form(shop_id, amount, secret1, currency, order_id)
 
     params = {
         "m":          shop_id,
@@ -84,11 +66,11 @@ async def create_invoice(
         "currency":   currency,
         "o":          order_id,
         "s":          sign,
-        "us_user_id": str(user_id),
+        "us_user_id": str(user_id),       # передаём user_id в вебхук
         "lang":       "ru",
+        "i":          "",                  # пустая строка = все методы
     }
     url = PAYMENT_URL + "?" + urlencode(params)
-    logger.info(f"[FREEKASSA] Payment URL: {url}")
 
     return FreekassaInvoice(order_id=order_id, url=url, amount=amount)
 
@@ -101,15 +83,13 @@ def verify_freekassa_webhook(
 ) -> bool:
     """
     Проверить подпись входящего уведомления от FreeKassa.
-    MD5(shop_id:amount:secret2:order_id)
+    FreeKassa присылает: MERCHANT_ID, AMOUNT, intid, MERCHANT_ORDER_ID, P_EMAIL, P_PHONE,
+                         CUR_ID, SIGN (MD5(shop_id:amount:secret2:order_id))
     """
     secret2 = config.freekassa_secret2
-    raw = f"{shop_id}:{amount}:{secret2}:{order_id}"
-    expected = hashlib.md5(raw.encode("utf-8")).hexdigest()
-    logger.info(
-        f"[FREEKASSA] Webhook sign check | "
-        f"raw={raw!r} expected={expected} received={received_sign}"
-    )
+    expected = hashlib.md5(
+        f"{shop_id}:{amount}:{secret2}:{order_id}".encode()
+    ).hexdigest()
     return hmac.compare_digest(expected.lower(), received_sign.lower())
 
 
@@ -118,9 +98,9 @@ async def get_order_status(order_id: str) -> Optional[str]:
     Проверить статус заказа через API FreeKassa.
     Возвращает 'success', 'pending', 'canceled' или None при ошибке.
     """
-    api_key = config.freekassa_api_key
-    shop_id = config.freekassa_shop_id
-    nonce   = str(uuid.uuid4().int)[:15]
+    api_key  = config.freekassa_api_key
+    shop_id  = config.freekassa_shop_id
+    nonce    = str(uuid.uuid4().int)[:15]
 
     params = {
         "shopId":  shop_id,
