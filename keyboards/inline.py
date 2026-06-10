@@ -194,8 +194,7 @@ def topup_kb() -> InlineKeyboardMarkup:
 
 def topup_method_kb(amount: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    builder.row(InlineKeyboardButton(text="💳 Карта / СБП (FreeKassa)", callback_data=f"topup_fk:{amount}"))
-    builder.row(InlineKeyboardButton(text="🏦 СБП (Lava)", callback_data=f"topup_lava:{amount}"))
+    builder.row(InlineKeyboardButton(text="💳 Карта / СБП", callback_data=f"topup_fk:{amount}"))
     builder.row(InlineKeyboardButton(text="💎 TON (CryptoBot)", callback_data=f"topup_ton:{amount}"))
     builder.row(InlineKeyboardButton(text="⭐ Telegram Stars", callback_data=f"topup_stars:{amount}"))
     builder.row(InlineKeyboardButton(text="🔙 Назад", callback_data="profile:topup"))
