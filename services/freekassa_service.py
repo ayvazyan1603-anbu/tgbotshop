@@ -32,9 +32,9 @@ class FreekassaInvoice:
     amount: float
 
 
-def _sign_form(shop_id: str, amount: float, secret1: str, currency: str, order_id: str) -> str:
-    """Подпись для формы оплаты: MD5(shop_id:amount:secret1:currency:order_id)."""
-    raw = f"{shop_id}:{amount:.2f}:{secret1}:{currency}:{order_id}"
+def _sign_form(shop_id: str, amount: float, secret1: str, order_id: str) -> str:
+    """Подпись для формы оплаты: MD5(shop_id:amount:secret1:order_id) — без currency."""
+    raw = f"{shop_id}:{amount:.2f}:{secret1}:{order_id}"
     return hashlib.md5(raw.encode()).hexdigest()
 
 
@@ -58,7 +58,7 @@ async def create_invoice(
     secret1  = config.freekassa_secret1
     order_id = f"topup_{user_id}_{uuid.uuid4().hex[:8]}"
 
-    sign = _sign_form(shop_id, amount, secret1, currency, order_id)
+    sign = _sign_form(shop_id, amount, secret1, order_id)
 
     params = {
         "m":          shop_id,
