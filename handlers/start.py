@@ -6,7 +6,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import repo
 from keyboards.inline import main_menu_kb
-from keyboards.reply import menu_reply_kb
 from lexicons.texts import main_menu
 from utils.photo_utils import send_or_edit_photo
 from config import config
@@ -41,9 +40,6 @@ async def cmd_start(message: Message, session: AsyncSession) -> None:
 
     if is_new and referrer_id:
         logger.info(f"New user {message.from_user.id} registered via referral of {referrer_id}")
-
-    # Показываем Reply Keyboard с кнопкой Меню (один раз при /start)
-    await message.answer("👋 Добро пожаловать!", reply_markup=menu_reply_kb())
 
     await send_or_edit_photo(
         event=message,
