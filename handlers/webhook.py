@@ -159,6 +159,7 @@ async def cryptobot_webhook_handler(request: web.Request) -> web.Response:
     CryptoBot отправляет POST при оплате инвойса.
     Поле payload содержит наш "topup:{user_id}:{amount_rub}"
     """
+    logger.info(f"CryptoBot webhook received: {await request.text()}")
     bot: Bot = request.app["bot"]
     body = await request.read()
 
