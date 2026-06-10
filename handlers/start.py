@@ -41,6 +41,8 @@ async def cmd_start(message: Message, session: AsyncSession) -> None:
     if is_new and referrer_id:
         logger.info(f"New user {message.from_user.id} registered via referral of {referrer_id}")
 
+    # Показываем Reply Keyboard с кнопкой Меню (один раз при /start)
+
     await send_or_edit_photo(
         event=message,
         photo_id=config.photo_id_main,
