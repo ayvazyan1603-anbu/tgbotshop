@@ -101,3 +101,22 @@ async def refund_purchase(
     if order:
         order.status = OrderStatus.REFUNDED
         await session.commit()
+
+
+async def send_topup_invoice(
+    bot,
+    chat_id: int,
+    amount_rub: int,
+) -> None:
+    """Отправить инвойс для пополнения баланса через Telegram Payments."""
+    from aiogram.types import LabeledPrice
+    await bot.send_invoice(
+        chat_id=chat_id,
+        title="Пополнение баланса",
+        description=f"Пополнение баланса на {amount_rub} руб.",
+        payload=f"topup:{chat_id}:{amount_rub}",
+        provider_token="",
+        currency="RUB",
+        prices=[LabeledPrice(label=f"Пополнение {amount_rub} руб.", amount=amount_rub * 100)],
+        start_parameter="topup",
+    )
