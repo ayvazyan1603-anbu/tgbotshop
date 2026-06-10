@@ -166,6 +166,73 @@ async def cb_topup_ton(callback: CallbackQuery) -> None:
         )
 
 
+# ─── FREEKASSA (Карта / СБП) ─────────────────────────────────────────────────
+
+@router.callback_query(F.data.startswith("topup_fk:"))
+async def cb_topup_freekassa(callback: CallbackQuery) -> None:
+    amount_str = callback.data.split(":")[1]
+    user_id = callback.from_user.id
+
+    logger.info(f"[FREEKASSA] cb_topup_fk called | user={user_id} amount_str={amount_str!r}")
+
+    if not config.freekassa_shop_id or not config.freekassa_secret1:
+        logger.error(
+            f"[FREEKASSA] Config missing! "
+            f"shop_id={config.freekassa_shop_id!r} secret1_set={bool(config.freekassa_secret1)}"
+        )
+        await callback.answer("❌ Оплата картой временно недоступна", show_alert=True)
+        return
+
+    try:
+        amount = float(amount_str)
+        if amount <= 0:
+            raise ValueError("Amount <= 0")
+    except ValueError as e:
+        logger.error(f"[FREEKASSA] Bad amount: {e}")
+        await callback.answer("❌ Некорректная сумма", show_alert=True)
+        return
+
+    await callback.answer("⏳ Создаём ссылку на оплату...")
+
+    try:
+        from services.freekassa_service import create_invoice
+        invoice = await create_invoice(amount=amount, user_id=user_id)
+        logger.info(
+            f"[FREEKASSA] Invoice created | user={user_id} amount={amount} "
+            f"order_id={invoice.order_id} url={invoice.url}"
+        )
+        from aiogram.utils.keyboard import InlineKeyboardBuilder
+        from aiogram.types import InlineKeyboardButton
+        builder = InlineKeyboardBuilder()
+        builder.row(InlineKeyboardButton(
+            text=f"💳 Оплатить {amount:.0f} руб.",
+            url=invoice.url,
+        ))
+        builder.row(InlineKeyboardButton(
+            text="🔙 Назад", callback_data="profile:topup"
+        ))
+        await safe_edit(
+            callback.message,
+            text=(
+                f"💳 <b>Оплата картой / СБП</b>\n\n"
+                f"Сумма: <b>{amount:.0f} руб.</b>\n"
+                f"Номер заказа: <code>{invoice.order_id}</code>\n\n"
+                "Нажмите кнопку — вы перейдёте на страницу оплаты FreeKassa.\n"
+                "После успешной оплаты баланс пополнится <b>автоматически</b>."
+            ),
+            reply_markup=builder.as_markup(),
+            parse_mode="HTML",
+        )
+    except Exception as e:
+        logger.error(f"[FREEKASSA] Invoice creation error: {e}", exc_info=True)
+        await safe_edit(
+            callback.message,
+            text=f"❌ <b>Ошибка создания платежа:</b> {e}\n\nПопробуйте позже.",
+            reply_markup=back_button("profile:topup"),
+            parse_mode="HTML",
+        )
+
+
 # ─── TELEGRAM PAYMENTS ───────────────────────────────────────────────────────
 
 @router.pre_checkout_query()
