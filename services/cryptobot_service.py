@@ -98,8 +98,21 @@ async def _rub_to_ton(rub_amount: float) -> float:
 
 
 def verify_cryptobot_webhook(body: bytes, signature: str) -> bool:
+    """
+    Проверяет подпись вебхука от CryptoBot.
+    Устойчива к лишним переносам строк от прокси-серверов и разнице в регистре сигнатур.
+    """
     if not config.cryptobot_token:
-        return True
-    secret = hashlib.sha256(config.cryptobot_token.encode()).digest()
-    expected = hmac.new(secret, body, hashlib.sha256).hexdigest()
-    return hmac.compare_digest(expected, signature)
+        return False
+
+    if not signature:
+        return False
+
+    # Секретный ключ создается как бинарный SHA256 хэш от токена
+    secret = hashlib.sha256(config.cryptobot_token.encode('utf-8')).digest()
+    
+    # .strip() очищает сырые байты от возможных мусорных \n и пробелов на краях
+    expected = hmac.new(secret, body.strip(), hashlib.sha256).hexdigest()
+    
+    # Безопасное сравнение строк хэшей в нижнем регистре
+    return hmac.compare_digest(expected.lower(), signature.lower())
