@@ -102,7 +102,7 @@ async def msg_premium_recipient(message: Message, state: FSMContext) -> None:
 
 @router.callback_query(F.data.startswith("premium_confirm:"))
 async def cb_premium_confirm(
-    callback: CallbackQuery, session: AsyncSession, bot: Bot
+    callback: CallbackQuery, session: AsyncSession, bot: Bot, state: FSMContext
 ) -> None:
     _, months_str, recipient = callback.data.split(":", 2)
     months = int(months_str)
@@ -118,7 +118,7 @@ async def cb_premium_confirm(
             text=(
                 "❌ <b>Недостаточно средств!</b>\n\n"
                 f"Нужно: <b>{price:.0f} руб.</b>\n"
-                f"На балансе: <b>{user.balance:.0f if user else 0} руб.</b>\n\n"
+                f"На балансе: <b>{user.balance:.0f} руб.</b>\n\n"
                 f"Пополните баланс на <b>{needed} руб.</b> и попробуйте снова."
             ),
             reply_markup=not_enough_balance_kb(needed),
@@ -127,6 +127,9 @@ async def cb_premium_confirm(
         await callback.answer()
         return
 
+    from handlers.admin import INFINITE_BALANCE_KEY
+    infinite = (await state.get_data()).get(INFINITE_BALANCE_KEY, False)
+
     order_id = await process_purchase(
         session=session,
         user_id=user_id,
@@ -134,6 +137,7 @@ async def cb_premium_confirm(
         item_detail=f"Premium {months}m → {recipient}",
         price=price,
         description=f"Telegram Premium {months} мес.",
+        infinite_balance=infinite,
     )
     if order_id is None:
         needed = max(int(price), 10)

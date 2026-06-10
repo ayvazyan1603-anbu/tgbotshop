@@ -8,11 +8,12 @@ from handlers.vpn import router as vpn_router
 from handlers.profile import router as profile_router
 from handlers.referral import router as referral_router
 from handlers.support_admin import router as support_admin_router
+from handlers.admin import router as admin_router
 
 
 def setup_routers() -> Router:
-    """Создаёт главный роутер и подключает все дочерние."""
     main_router = Router()
+    main_router.include_router(admin_router)        # первым — чтобы /testbalance не перехватывался
     main_router.include_router(start_router)
     main_router.include_router(stars_router)
     main_router.include_router(premium_router)

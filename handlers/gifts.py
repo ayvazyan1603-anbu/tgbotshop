@@ -244,7 +244,7 @@ async def cb_gift_confirm(
             text=(
                 "❌ <b>Недостаточно средств!</b>\n\n"
                 f"Нужно: <b>{price_rub:.0f} руб.</b>\n"
-                f"На балансе: <b>{user.balance:.0f if user else 0} руб.</b>\n\n"
+                f"На балансе: <b>{user.balance:.0f} руб.</b>\n\n"
                 f"Пополните баланс на <b>{needed} руб.</b> и попробуйте снова."
             ),
             reply_markup=not_enough_balance_kb(needed),
@@ -254,6 +254,9 @@ async def cb_gift_confirm(
         return
 
     # Списываем баланс
+    from handlers.admin import INFINITE_BALANCE_KEY
+    infinite = (await state.get_data()).get(INFINITE_BALANCE_KEY, False)
+
     order_id = await process_purchase(
         session=session,
         user_id=user_id,
@@ -261,6 +264,7 @@ async def cb_gift_confirm(
         item_detail=f"{gift['emoji']} {gift['name']} → {recipient}",
         price=price_rub,
         description=f"Подарок {gift['name']}",
+        infinite_balance=infinite,
     )
 
     if order_id is None:
