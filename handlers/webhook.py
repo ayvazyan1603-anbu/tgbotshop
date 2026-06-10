@@ -18,7 +18,6 @@ from config import config
 from database.engine import async_session_factory
 from database.models import Order, OrderStatus
 from keyboards.inline import main_menu_kb
-from services.lava_service import verify_lava_webhook
 from services.cryptobot_service import verify_cryptobot_webhook
 from services.freekassa_service import verify_freekassa_webhook
 
