@@ -217,32 +217,28 @@ async def handle_withdraw_amt(message: Message, state: FSMContext, bot: Bot) -> 
     await state.set_state(None)
     await state.update_data(admin_auth=True)
 
-    await message.answer(f"⏳ Выполняю перевод <b>{amount} ⭐</b> → @{username}...", parse_mode="HTML")
-
-    try:
-        # Официальный метод: transferStars (Bot API 9.0+)
-        await bot.transfer_stars(
-            user_id=message.from_user.id,  # получатель — текущий admin
-            nanostar_amount=amount * 1_000_000_000,
-        )
-        logger.info(f"[ADMIN PANEL] Stars transferred: {amount} to {username}")
-        await message.answer(
-            f"✅ <b>Успешно!</b>\n\n"
-            f"Переведено <b>{amount} ⭐</b> → @{username}",
-            reply_markup=_panel_kb(),
-            parse_mode="HTML",
-        )
-    except Exception as e:
-        logger.error(f"[ADMIN PANEL] transfer_stars error: {e}")
-        # Fallback: рефанд через refundStarPayment не подходит для вывода
-        # Используем send_invoice для вывода через механизм возврата
-        await message.answer(
-            f"❌ <b>Ошибка перевода:</b> <code>{e}</code>\n\n"
-            f"<b>Альтернатива:</b> используйте @BotFather → ваш бот → Stars → Withdraw\n"
-            f"или команду /refundstars если нужен возврат конкретному пользователю.",
-            reply_markup=_panel_kb(),
-            parse_mode="HTML",
-        )
+    # Telegram Bot API не поддерживает программный перевод Stars с бота на аккаунт.
+    # Показываем администратору инструкцию по ручному выводу.
+    logger.info(f"[ADMIN PANEL] Withdraw request: {amount} Stars to @{username}")
+    await message.answer(
+        f"📤 <b>Вывод {amount} ⭐ Stars → @{username}</b>\n\n"
+        f"Telegram Bot API не поддерживает автоматический перевод Stars с бота на аккаунт.\n\n"
+        f"<b>Как вывести Stars вручную:</b>\n\n"
+        f"<b>Способ 1 — через Fragment:</b>\n"
+        f"1. Зайдите на fragment.com\n"
+        f"2. Подключите кошелёк (TON Space или Tonkeeper)\n"
+        f"3. Выберите <b>Stars → Withdraw</b>\n"
+        f"4. Введите @{username} и количество: {amount}\n\n"
+        f"<b>Способ 2 — через BotFather:</b>\n"
+        f"1. Напишите @BotFather\n"
+        f"2. Выберите вашего бота\n"
+        f"3. Bot Settings → Stars → Withdraw Stars\n\n"
+        f"<b>Способ 3 — возврат Stars покупателю:</b>\n"
+        f"Используйте кнопку <b>«Возврат»</b> в конкретном заказе — "
+        f"это вернёт Stars тому, кто их заплатил.",
+        reply_markup=_panel_kb(),
+        parse_mode="HTML",
+    )
 
 
 # ─── ПОПОЛНЕНИЕ STARS БОТА ───────────────────────────────────────────────────
