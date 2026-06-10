@@ -127,7 +127,15 @@ async def msg_stars_custom_amount(message: Message, state: FSMContext) -> None:
 async def cb_stars_self(callback: CallbackQuery, state: FSMContext) -> None:
     parts = callback.data.split(":", 2)
     amount = int(parts[1])
-    recipient = str(callback.from_user.id)
+    # Fragment API требует username, не user_id
+    recipient = callback.from_user.username
+    if not recipient:
+        await callback.answer(
+            "❌ У вас нет username в Telegram. Установите его в настройках профиля.",
+            show_alert=True,
+        )
+        return
+    recipient = recipient.lstrip("@")
     price = calc_stars_price(amount)
     await state.clear()
     await safe_edit(
