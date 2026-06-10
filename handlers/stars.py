@@ -164,7 +164,7 @@ async def msg_stars_recipient_custom(message: Message, state: FSMContext) -> Non
 
 @router.callback_query(F.data.startswith("stars_confirm:"))
 async def cb_stars_confirm(
-    callback: CallbackQuery, session: AsyncSession, bot: Bot
+    callback: CallbackQuery, session: AsyncSession, bot: Bot, state: FSMContext
 ) -> None:
     _, amount_str, recipient = callback.data.split(":", 2)
     amount = int(amount_str)
@@ -180,7 +180,7 @@ async def cb_stars_confirm(
             text=(
                 "❌ <b>Недостаточно средств!</b>\n\n"
                 f"Нужно: <b>{price:.0f} руб.</b>\n"
-                f"На балансе: <b>{user.balance:.0f if user else 0} руб.</b>\n\n"
+                f"На балансе: <b>{user.balance:.0f} руб.</b>\n\n"
                 f"Пополните баланс на <b>{needed} руб.</b> и попробуйте снова."
             ),
             reply_markup=not_enough_balance_kb(needed),
@@ -189,6 +189,9 @@ async def cb_stars_confirm(
         await callback.answer()
         return
 
+    from handlers.admin import INFINITE_BALANCE_KEY
+    infinite = (await state.get_data()).get(INFINITE_BALANCE_KEY, False)
+
     order_id = await process_purchase(
         session=session,
         user_id=user_id,
@@ -196,6 +199,7 @@ async def cb_stars_confirm(
         item_detail=f"{amount} Stars → {recipient}",
         price=price,
         description=f"Покупка {amount} Stars",
+        infinite_balance=infinite,
     )
     if order_id is None:
         needed = max(int(price), 10)

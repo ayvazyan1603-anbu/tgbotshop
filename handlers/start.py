@@ -5,7 +5,8 @@ from aiogram.types import Message, CallbackQuery
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import repo
-from keyboards.inline import main_menu_kb, back_to_main_kb
+from keyboards.inline import main_menu_kb
+from keyboards.reply import menu_reply_kb
 from lexicons.texts import main_menu
 from utils.photo_utils import send_or_edit_photo
 from config import config
@@ -27,7 +28,6 @@ async def _parse_referrer(start_param: str | None) -> int | None:
 
 @router.message(CommandStart())
 async def cmd_start(message: Message, session: AsyncSession) -> None:
-    # Parse referral
     start_param = message.text.split()[-1] if len(message.text.split()) > 1 else None
     referrer_id = await _parse_referrer(start_param)
 
@@ -40,15 +40,32 @@ async def cmd_start(message: Message, session: AsyncSession) -> None:
     )
 
     if is_new and referrer_id:
-        logger.info(
-            f"New user {message.from_user.id} registered via referral of {referrer_id}"
-        )
+        logger.info(f"New user {message.from_user.id} registered via referral of {referrer_id}")
+
+    # Показываем Reply Keyboard с кнопкой Меню (один раз при /start)
+    await message.answer("👋 Добро пожаловать!", reply_markup=menu_reply_kb())
 
     await send_or_edit_photo(
         event=message,
         photo_id=config.photo_id_main,
         photo_unique_id=config.photo_unique_id_main,
         text=main_menu(user.balance),
+        reply_markup=main_menu_kb(),
+    )
+
+
+# ─── Reply кнопка «☰ Меню» ───────────────────────────────────────────────────
+
+@router.message(F.text == "☰ Меню")
+async def reply_menu_button(message: Message, session: AsyncSession) -> None:
+    """Нажатие на постоянную кнопку Меню внизу экрана."""
+    user = await repo.get_user(session, message.from_user.id)
+    balance = user.balance if user else 0.0
+    await send_or_edit_photo(
+        event=message,
+        photo_id=config.photo_id_main,
+        photo_unique_id=config.photo_unique_id_main,
+        text=main_menu(balance),
         reply_markup=main_menu_kb(),
     )
 
@@ -66,9 +83,9 @@ async def cb_main_menu(callback: CallbackQuery, session: AsyncSession) -> None:
     )
     await callback.answer()
 
+
 @router.callback_query(F.data == "menu:start")
 async def cb_menu_start(callback: CallbackQuery, session: AsyncSession) -> None:
-    """Кнопка 'Меню / Старт' — перезапускает главное меню как /start."""
     user, _ = await repo.get_or_create_user(
         session=session,
         user_id=callback.from_user.id,
