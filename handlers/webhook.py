@@ -101,10 +101,6 @@ async def cryptobot_webhook_handler(request: web.Request) -> web.Response:
     CryptoBot отправляет POST при оплате инвойса.
     Поле payload содержит наш "topup:{user_id}:{amount_rub}"
     """
-    logger.info(f" Сверяем подписи! Пришла: {signature}")
-    secret = hashlib.sha256(config.cryptobot_token.encode()).digest()
-    expected = hmac.new(secret, body, hashlib.sha256).hexdigest()
-    logger.info(f" Ожидали: {expected}")
     bot: Bot = request.app["bot"]
     body = await request.read()
 
