@@ -19,6 +19,5 @@ __all__ = [
     "get_star_recipient", "create_star_order",
     "get_premium_recipient", "create_premium_order",
     "get_wallet_balance", "FragmentAPIError",
-    "create_lava_invoice", "verify_lava_webhook",
     "create_cryptobot_invoice", "verify_cryptobot_webhook",
 ]
