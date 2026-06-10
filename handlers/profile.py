@@ -66,8 +66,9 @@ async def cb_topup_menu(callback: CallbackQuery, state: FSMContext) -> None:
             "💳 <b>Пополнение баланса</b>\n\n"
             "Введите сумму в рублях или выберите готовый вариант.\n\n"
             "💳 Способы оплаты:\n"
-            "• 🏦 <b>СБП</b> — оплата через Систему Быстрых Платежей (Lava)\n"
-            "• 💎 <b>TON</b> — оплата криптовалютой через @CryptoBot"
+            "• 🏦 <b>СБП</b> — оплата через Систему Быстрых Платежей\n"
+            "• 💎 <b>TON</b> — оплата криптовалютой через @CryptoBot\n"
+            "• ⭐️ <b>Telegram stars</b> — пополнение баланса через звезды"
         ),
         reply_markup=topup_kb(),
         parse_mode="HTML",
