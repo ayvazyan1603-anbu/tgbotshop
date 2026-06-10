@@ -18,7 +18,6 @@ def main_menu_kb() -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="🤝 Партнёрская сеть", callback_data="menu:referral"),
     )
     builder.row(InlineKeyboardButton(text="🆘 Поддержка", callback_data="menu:support"))
-    builder.row(InlineKeyboardButton(text="▶️ Старт / Меню", callback_data="menu:start"))
     return builder.as_markup()
 
 
