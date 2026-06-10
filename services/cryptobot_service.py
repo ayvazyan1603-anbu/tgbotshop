@@ -34,9 +34,9 @@ async def register_webhook(app_url: str) -> bool:
     webhook_url = f"{app_url.rstrip('/')}/webhook/cryptobot"
     headers = {"Crypto-Pay-API-Token": config.cryptobot_token}
     async with aiohttp.ClientSession() as session:
-        async with session.get(
+        async with session.post(
             f"{BASE_URL}/setWebhook",
-            params={"url": webhook_url},
+            json={"url": webhook_url},
             headers=headers,
             timeout=aiohttp.ClientTimeout(total=10),
         ) as resp:
