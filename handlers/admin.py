@@ -13,7 +13,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import config
 from database import repo
-from keyboards.reply import menu_reply_kb
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -39,13 +38,13 @@ async def cmd_test_balance(message: Message, state: FSMContext) -> None:
             "Теперь ты можешь покупать любые товары без списания средств.\n"
             "Реальный баланс в БД не изменится.\n\n"
             "Повтори /testbalance чтобы выключить.",
-            reply_markup=menu_reply_kb(),
+            
         )
     else:
         await message.answer(
             "🔴 <b>Бесконечный баланс ВЫКЛЮЧЕН</b>\n\n"
             "Теперь работает обычный режим с реальным балансом.",
-            reply_markup=menu_reply_kb(),
+            
         )
 
 
