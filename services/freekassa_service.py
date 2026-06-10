@@ -68,7 +68,7 @@ async def create_invoice(
         "s":          sign,
         "us_user_id": str(user_id),       # передаём user_id в вебхук
         "lang":       "ru",
-        "i":          "",                  # пустая строка = все методы
+        
     }
     url = PAYMENT_URL + "?" + urlencode(params)
 
