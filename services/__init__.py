@@ -9,7 +9,6 @@ from services.fragment_service import (
     get_premium_recipient, create_premium_order,
     get_wallet_balance, FragmentAPIError,
 )
-from services.lava_service import create_invoice as create_lava_invoice, verify_lava_webhook
 from services.cryptobot_service import create_invoice as create_cryptobot_invoice, verify_cryptobot_webhook
 
 __all__ = [
