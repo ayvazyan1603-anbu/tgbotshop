@@ -31,12 +31,6 @@ class Config:
     fragment_webhook_secret: str
     webhook_port: int
 
-    # Lava.ru (СБП + карты)
-    lava_api_key: str
-    lava_secret_key: str
-    lava_shop_id: str
-    lava_verify_code: str
-
     # CryptoBot (TON + крипта)
     cryptobot_token: str
 
